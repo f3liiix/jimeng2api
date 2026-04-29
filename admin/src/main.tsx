@@ -452,12 +452,15 @@ function App() {
         )}
 
         {activeTab === "tasks" && (
-          <Panel title="任务记录" description="最近 200 条外部提交任务，包含使用的 API Key 与账号。">
-            <div className="flex justify-end">
+          <Panel
+            title="任务记录"
+            description="最近 200 条外部提交任务，包含使用的 API Key 与账号。"
+            action={
               <Button size="sm" variant="secondary" onPress={() => loadTasks()}>
                 刷新状态
               </Button>
-            </div>
+            }
+          >
             <DataTable ariaLabel="任务记录" rows={tasks} columns={["id", "type", "status", "api_key_id", "token_id", "created_at", "updated_at", "error"]} />
           </Panel>
         )}
@@ -489,11 +492,14 @@ function App() {
   );
 }
 
-function Panel(props: { title: string; description: string; children: React.ReactNode }) {
+function Panel(props: { title: string; description: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <Card>
-      <Card.Header className="items-start gap-1">
-        <Card.Title className="text-2xl tracking-tight">{props.title}</Card.Title>
+      <Card.Header className="items-start gap-3">
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <Card.Title className="text-2xl tracking-tight">{props.title}</Card.Title>
+          {props.action && <div className="shrink-0">{props.action}</div>}
+        </div>
         <Card.Description>{props.description}</Card.Description>
       </Card.Header>
       <Card.Content className="gap-6">
