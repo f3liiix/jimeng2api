@@ -2,14 +2,18 @@ import { query } from "@/lib/db/client.ts";
 import {
   ApiKeyRecord,
   createApiKeySecret,
+  decryptApiKeySecret,
+  encryptApiKeySecret,
   hashApiKey,
 } from "@/lib/auth/api-keys.ts";
 
-function mapApiKeyRow(row: any): ApiKeyRecord {
+function mapApiKeyRow(row: any, options: { includeSecret?: boolean } = {}): ApiKeyRecord {
   return {
     id: row.id,
     name: row.name,
     keyHash: row.key_hash,
+    keyCiphertext: row.key_ciphertext,
+    secret: options.includeSecret && row.key_ciphertext ? decryptApiKeySecret(row.key_ciphertext) : null,
     status: row.status,
     lastUsedAt: row.last_used_at,
     createdAt: row.created_at,
@@ -20,23 +24,23 @@ function mapApiKeyRow(row: any): ApiKeyRecord {
 export class ApiKeyStore {
   async list() {
     const result = await query(
-      `SELECT id, name, key_hash, status, last_used_at, created_at, revoked_at
+      `SELECT id, name, key_hash, key_ciphertext, status, last_used_at, created_at, revoked_at
        FROM api_keys
        ORDER BY created_at DESC`,
     );
-    return result.rows.map(mapApiKeyRow);
+    return result.rows.map((row) => mapApiKeyRow(row, { includeSecret: true }));
   }
 
   async create(name: string) {
     const secret = createApiKeySecret();
     const result = await query(
-      `INSERT INTO api_keys (name, key_hash)
-       VALUES ($1, $2)
-       RETURNING id, name, key_hash, status, last_used_at, created_at, revoked_at`,
-      [name, hashApiKey(secret)],
+      `INSERT INTO api_keys (name, key_hash, key_ciphertext)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, key_hash, key_ciphertext, status, last_used_at, created_at, revoked_at`,
+      [name, hashApiKey(secret), encryptApiKeySecret(secret)],
     );
     return {
-      apiKey: mapApiKeyRow(result.rows[0]),
+      apiKey: mapApiKeyRow(result.rows[0], { includeSecret: true }),
       secret,
     };
   }
@@ -44,18 +48,20 @@ export class ApiKeyStore {
   async ensureInitial(name: string, secret: string) {
     const keyHash = hashApiKey(secret);
     const result = await query(
-      `INSERT INTO api_keys (name, key_hash)
-       VALUES ($1, $2)
-       ON CONFLICT (key_hash) DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, name, key_hash, status, last_used_at, created_at, revoked_at`,
-      [name, keyHash],
+      `INSERT INTO api_keys (name, key_hash, key_ciphertext)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (key_hash) DO UPDATE
+       SET name = EXCLUDED.name,
+           key_ciphertext = EXCLUDED.key_ciphertext
+       RETURNING id, name, key_hash, key_ciphertext, status, last_used_at, created_at, revoked_at`,
+      [name, keyHash, encryptApiKeySecret(secret)],
     );
     return mapApiKeyRow(result.rows[0]);
   }
 
   async findActiveBySecret(secret: string) {
     const result = await query(
-      `SELECT id, name, key_hash, status, last_used_at, created_at, revoked_at
+      `SELECT id, name, key_hash, key_ciphertext, status, last_used_at, created_at, revoked_at
        FROM api_keys
        WHERE key_hash = $1 AND status = 'active'
        LIMIT 1`,
@@ -66,15 +72,14 @@ export class ApiKeyStore {
     return mapApiKeyRow(result.rows[0]);
   }
 
-  async revoke(id: string) {
+  async delete(id: string) {
     const result = await query(
-      `UPDATE api_keys
-       SET status = 'revoked', revoked_at = now()
+      `DELETE FROM api_keys
        WHERE id = $1
-       RETURNING id, name, key_hash, status, last_used_at, created_at, revoked_at`,
+       RETURNING id, name, key_hash, key_ciphertext, status, last_used_at, created_at, revoked_at`,
       [id],
     );
-    return result.rowCount ? mapApiKeyRow(result.rows[0]) : null;
+    return result.rowCount ? mapApiKeyRow(result.rows[0], { includeSecret: true }) : null;
   }
 }
 

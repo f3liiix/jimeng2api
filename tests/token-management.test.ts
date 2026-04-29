@@ -5,7 +5,10 @@ import {
   hashApiKey,
   verifyApiKeyHash,
   createApiKeySecret,
+  decryptApiKeySecret,
+  encryptApiKeySecret,
 } from "../src/lib/auth/api-keys.ts";
+import { ApiKeyStore } from "../src/lib/auth/api-key-store.ts";
 import {
   decryptToken,
   encryptToken,
@@ -26,6 +29,22 @@ test("api key secrets are hashed and verified without storing plaintext", () => 
   assert.notEqual(hash, secret);
   assert.equal(verifyApiKeyHash(secret, hash), true);
   assert.equal(verifyApiKeyHash(`${secret}x`, hash), false);
+});
+
+test("api key secrets can be encrypted for admin display without storing plaintext", () => {
+  const secret = "jm_internal-test-key";
+  const ciphertext = encryptApiKeySecret(secret, "test-secret");
+
+  assert.notEqual(ciphertext, secret);
+  assert.match(ciphertext, /^v1:/);
+  assert.equal(decryptApiKeySecret(ciphertext, "test-secret"), secret);
+});
+
+test("api key store delete operation physically removes records", () => {
+  const deleteSource = ApiKeyStore.prototype.delete?.toString() || "";
+
+  assert.match(deleteSource, /DELETE\s+FROM\s+api_keys/i);
+  assert.doesNotMatch(deleteSource, /SET\s+status\s*=\s*'revoked'/i);
 });
 
 test("managed tokens are encrypted at rest and decrypted for upstream calls", () => {

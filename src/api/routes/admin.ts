@@ -25,6 +25,7 @@ function redactApiKey(apiKey: any) {
   return {
     id: apiKey.id,
     name: apiKey.name,
+    api_key: apiKey.secret || null,
     status: apiKey.status,
     last_used_at: apiKey.lastUsedAt,
     created_at: apiKey.createdAt,
@@ -173,7 +174,7 @@ export default {
 
     "/api-keys/:id": async (request: Request) => {
       requireAdmin(request);
-      const apiKey = await apiKeyStore.revoke(request.params.id);
+      const apiKey = await apiKeyStore.delete(request.params.id);
       if (!apiKey) throw invalidRequest(`API Key ${request.params.id} not found`, "id");
       return redactApiKey(apiKey);
     },

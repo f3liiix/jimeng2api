@@ -23,3 +23,8 @@ export function getTaskRefreshIntervalMs(tasks: Array<{ status?: string | null }
     ? ACTIVE_TASK_REFRESH_INTERVAL_MS
     : IDLE_TASK_REFRESH_INTERVAL_MS;
 }
+
+export function mergeCreatedApiKey<T extends { id?: string | null }>(rows: T[], created?: T | null) {
+  if (!created?.id) return rows;
+  return [created, ...rows.filter((row) => row.id !== created.id)];
+}

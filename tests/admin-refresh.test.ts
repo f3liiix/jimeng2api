@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getAdminRouteFromPathname, getTaskRefreshIntervalMs } from "../admin/src/refresh.ts";
+import { getAdminRouteFromPathname, getTaskRefreshIntervalMs, mergeCreatedApiKey } from "../admin/src/refresh.ts";
 
 test("admin route parser maps supported paths to pages", () => {
   assert.equal(getAdminRouteFromPathname("/admin"), "tokens");
@@ -25,4 +25,18 @@ test("task refresh interval is faster while tasks are active", () => {
 test("task refresh interval slows down when there are no active tasks", () => {
   assert.equal(getTaskRefreshIntervalMs([]), 60_000);
   assert.equal(getTaskRefreshIntervalMs([{ status: "succeeded" }, { status: "failed" }]), 60_000);
+});
+
+test("created API key is shown immediately at the top of the table", () => {
+  const existing = [
+    { id: "old", name: "old caller" },
+    { id: "same", name: "stale caller" },
+  ];
+  const created = { id: "same", name: "new caller", api_key: "jm_new" };
+
+  assert.deepEqual(mergeCreatedApiKey(existing, created), [
+    created,
+    { id: "old", name: "old caller" },
+  ]);
+  assert.equal(mergeCreatedApiKey(existing, null), existing);
 });

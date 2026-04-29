@@ -8,6 +8,7 @@ import {
   adminRoutes,
   getAdminRouteFromPathname,
   getTaskRefreshIntervalMs,
+  mergeCreatedApiKey,
   type AdminRoute,
 } from "./refresh.ts";
 
@@ -26,6 +27,7 @@ type TokenRecord = {
 type ApiKeyRecord = {
   id: string;
   name: string;
+  api_key?: string | null;
   status: string;
   last_used_at?: string | null;
   created_at: string;
@@ -61,6 +63,7 @@ const tabLabels: Record<AdminRoute, string> = {
 
 const columnLabels: Record<string, string> = {
   actions: "操作",
+  api_key: "API Key",
   api_key_id: "API Key 标识",
   created_at: "创建时间",
   error: "错误",
@@ -149,6 +152,7 @@ function App() {
   const api = useCallback(async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`/admin/api${path}`, {
       ...options,
+      cache: "no-store",
       headers: {
         ...headers,
         ...(options.headers || {}),
@@ -251,13 +255,13 @@ function App() {
   async function createApiKey(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const body = await api<{ secret: string }>("/api-keys", {
+    const body = await api<{ api_key: ApiKeyRecord; secret: string }>("/api-keys", {
       method: "POST",
       body: JSON.stringify({ name: form.get("name") }),
     });
     setNewSecret(body.secret);
+    setApiKeys((current) => mergeCreatedApiKey(current, { ...body.api_key, api_key: body.secret }));
     event.currentTarget.reset();
-    await loadApiKeys();
   }
 
   async function resolveAlert(id: string) {
@@ -297,7 +301,7 @@ function App() {
     await loadTokens();
   }
 
-  async function revokeApiKey(id: string) {
+  async function deleteApiKey(id: string) {
     await api(`/api-keys/${id}`, { method: "DELETE" });
     await loadApiKeys();
   }
@@ -419,7 +423,7 @@ function App() {
         )}
 
         {activeTab === "api-keys" && (
-          <Panel title="API Keys" description="外部调用方只需要使用这里生成的 API Key。密钥只在创建时显示一次。">
+          <Panel title="API Keys" description="外部调用方只需要使用这里生成的 API Key，可在表格中查看并复制。">
             <form className="grid gap-3 md:grid-cols-[minmax(220px,360px)_auto]" onSubmit={createApiKey}>
               <HeroText name="name" label="调用方" placeholder="调用方名称" required />
               <Button className="self-end" type="submit">
@@ -430,7 +434,7 @@ function App() {
             {newSecret && (
               <Card variant="transparent">
                 <Card.Content>
-                  <p className="mb-2 text-sm text-muted">新密钥只显示一次，请立即保存。</p>
+                  <p className="mb-2 text-sm text-muted">新密钥已生成，也可在下方表格中复制。</p>
                   <code className="block overflow-auto rounded-2xl p-3 text-sm text-foreground">{newSecret}</code>
                 </Card.Content>
               </Card>
@@ -439,11 +443,9 @@ function App() {
             <DataTable
               ariaLabel="API Keys"
               rows={apiKeys}
-              columns={["name", "status", "last_used_at", "created_at"]}
+              columns={["name", "status", "api_key", "last_used_at", "created_at"]}
               renderActions={(apiKey) => (
-                apiKey.status === "active"
-                  ? <Button size="sm" variant="danger-soft" onPress={() => revokeApiKey(apiKey.id)}>吊销</Button>
-                  : null
+                <Button size="sm" variant="danger-soft" onPress={() => deleteApiKey(apiKey.id)}>删除</Button>
               )}
             />
           </Panel>
@@ -590,7 +592,38 @@ function renderCell(column: string, value: unknown) {
   if (column === "status") {
     return <StatusChip status={String(value || "unknown")} />;
   }
+  if (column === "api_key") {
+    return <ApiKeyCell value={typeof value === "string" ? value : ""} />;
+  }
   return <span className="block max-w-md truncate text-sm text-muted">{formatCell(value, column)}</span>;
+}
+
+function ApiKeyCell({ value }: { value: string }) {
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  if (!value) {
+    return <span className="text-sm text-muted">不可恢复</span>;
+  }
+
+  async function copyApiKey() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus("idle"), 1500);
+    } catch {
+      setCopyStatus("failed");
+      window.setTimeout(() => setCopyStatus("idle"), 1500);
+    }
+  }
+
+  return (
+    <div className="flex max-w-xl items-center gap-2">
+      <code className="block min-w-0 flex-1 truncate text-sm text-foreground">{value}</code>
+      <Button size="sm" variant="secondary" onPress={copyApiKey}>
+        {copyStatus === "copied" ? "已复制" : copyStatus === "failed" ? "复制失败" : "复制"}
+      </Button>
+    </div>
+  );
 }
 
 function StatusChip({ status }: { status: string }) {
