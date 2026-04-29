@@ -1,5 +1,5 @@
 # 构建阶段
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -28,7 +28,7 @@ RUN if [ -n "$VERSION" ]; then \
 RUN npm run build
 
 # 生产阶段
-FROM node:18-alpine AS production
+FROM node:24-alpine AS production
 
 # 安装健康检查工具
 RUN apk add --no-cache wget

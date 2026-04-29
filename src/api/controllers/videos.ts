@@ -225,10 +225,10 @@ export async function generateVideo(
     filePaths,
   });
 
-  // omni_reference 仅支持 seedance 2.0 (40_pro) 和 2.0-fast (40) 模型
+  // omni_reference 仅支持 Seedance 2.0 系列模型
   if (isOmniMode && !is40Pro && !is40) {
     throw new APIException(EX.API_REQUEST_FAILED,
-      `omni_reference 模式仅支持 jimeng-video-seedance-2.0 和 jimeng-video-seedance-2.0-fast 模型`);
+      `omni_reference 模式仅支持 jimeng-video-seedance-2.0、jimeng-video-seedance-2.0-fast、jimeng-video-seedance-2.0-vip 和 jimeng-video-seedance-2.0-fast-vip 模型`);
   }
 
   let requestData: any;

@@ -210,6 +210,51 @@ For more details, see `jimeng2api/Skill.md`.
 
 ## 📖 API Documentation
 
+### Asynchronous Task Flow
+
+Image and video generation endpoints are asynchronous. A `POST` request only submits a task and returns immediately; it does not contain the generated image or video URLs. Poll the task endpoint until the status becomes `succeeded`, then read `result` or call the result endpoint.
+
+```bash
+# 1. Submit a generation task
+curl -X POST http://localhost:5100/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_SESSION_ID" \
+  -d '{"model":"jimeng-4.5","prompt":"A cute little cat"}'
+
+# 2. Poll task status
+curl http://localhost:5100/v1/tasks/task_xxxxx
+
+# 3. Fetch final result after status is succeeded
+curl http://localhost:5100/v1/tasks/task_xxxxx/result
+```
+
+**Task response**:
+```json
+{
+  "id": "task_550e8400-e29b-41d4-a716-446655440000",
+  "object": "task",
+  "type": "image_generation",
+  "status": "queued",
+  "created": 1703123456,
+  "updated": 1703123456,
+  "result_url": "/v1/tasks/task_550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Task statuses**: `queued`, `running`, `succeeded`, `failed`.
+
+**Final image result example**:
+```json
+{
+  "created": 1703123456,
+  "data": [
+    {
+      "url": "https://p3-sign.toutiaoimg.com/tos-cn-i-tb4s082cfz/abc123.webp"
+    }
+  ]
+}
+```
+
 ### Text-to-Image
 
 **POST** `/v1/images/generations`
@@ -222,7 +267,7 @@ For more details, see `jimeng2api/Skill.md`.
 - `intelligent_ratio` (boolean, optional): Whether to enable intelligent ratio, defaults to `false`. **⚠️ This parameter only works for the jimeng-4.0/jimeng-4.1/jimeng-4.5/jimeng-4.6/jimeng-5.0 model; other models will ignore it.** When enabled, the system automatically infers the optimal image ratio from the prompt (e.g., "portrait" → 9:16, "landscape" → 16:9).
 - `negative_prompt` (string, optional): Negative prompt.
 - `sample_strength` (number, optional): Sampling strength (0.0-1.0).
-- `response_format` (string, optional): Response format ("url"(default) or "b64_json").
+- `response_format` (string, optional): Final task result format ("url"(default) or "b64_json"). The submit response is always a task object.
 
 ```bash
 # Default parameters (ratio: "1:1", resolution: "2k")
@@ -257,6 +302,8 @@ curl -X POST http://localhost:5100/v1/images/generations \
 - `jimeng-4.0`: Works on all sites.
 - `jimeng-3.1`: China site only.
 - `jimeng-3.0`: Works on all sites.
+
+Unsupported or region-incompatible models now return `400 invalid_request_error` instead of silently falling back to the default model.
 
 **Supported Ratios and Corresponding Resolutions**:
 | resolution | ratio | Resolution |
@@ -313,7 +360,7 @@ curl -X POST http://localhost:5100/v1/images/compositions \
 - `intelligent_ratio` (boolean, optional): Whether to enable intelligent ratio, defaults to `false`. **⚠️ This parameter only works for the jimeng-4.0/jimeng-4.1/jimeng-4.5 model; other models will ignore it.** When enabled, the system automatically adjusts the output ratio based on the prompt and input images.
 - `negative_prompt` (string, optional): Negative prompt.
 - `sample_strength` (number, optional): Sampling strength (0.0-1.0).
-- `response_format` (string, optional): Response format ("url"(default) or "b64_json").
+- `response_format` (string, optional): Final task result format ("url"(default) or "b64_json"). The submit response is always a task object.
 
 **Limits**:
 - Number of input images: 1-10
@@ -349,19 +396,20 @@ curl -X POST http://localhost:5100/v1/images/compositions \
   -F "images=@/path/to/your/image2.png"
 ```
 
-**Successful Response Example** (applies to all examples above):
+**Submit Response Example** (applies to all examples above):
 ```json
 {
+  "id": "task_550e8400-e29b-41d4-a716-446655440000",
+  "object": "task",
+  "type": "image_composition",
+  "status": "queued",
   "created": 1703123456,
-  "data": [
-    {
-      "url": "https://p3-sign.toutiaoimg.com/tos-cn-i-tb4s082cfz/abc123.webp"
-    }
-  ],
-  "input_images": 1,
-  "composition_type": "multi_image_synthesis"
+  "updated": 1703123456,
+  "result_url": "/v1/tasks/task_550e8400-e29b-41d4-a716-446655440000"
 }
 ```
+
+Use `GET /v1/tasks/{id}` or `GET /v1/tasks/{id}/result` to retrieve the final `data` after the task succeeds.
 
 #### ❓ **FAQ & Solutions**
 
@@ -369,7 +417,7 @@ curl -X POST http://localhost:5100/v1/images/compositions \
 A: Make sure the image URL is reachable, the format is supported, and the file size is under 100MB.
 
 **Q: What if generation takes too long?**
-A: Complex multi-image compositions can take longer. If it still isn't done after 10 minutes, try resubmitting the request.
+A: Check `GET /v1/tasks/{id}`. Complex multi-image compositions can stay `running` for several minutes. If the task becomes `failed`, inspect its `error` field and resubmit if needed.
 
 **Q: How to improve composition quality?**
 A:
@@ -393,7 +441,7 @@ Generate a video from a text prompt (Text-to-Video) or from start/end frame imag
 1. **Text-to-Video**: Pure text prompt without any images
 2. **Image-to-Video**: Single image as the first frame
 3. **First-Last Frame**: Two images as the first and last frames
-4. **Omni Reference** (New): Mixed image + video inputs as reference materials, with `@field_name` references in the prompt to describe each material's role. Only supported by `jimeng-video-seedance-2.0` and `jimeng-video-seedance-2.0-fast`.
+4. **Omni Reference** (New): Supports pure text prompts or optional mixed image/video reference materials. When materials are provided, use `@field_name` references in the prompt to describe each material's role. Supported by Seedance 2.0, Seedance 2.0 Fast, and their VIP variants.
 
 > **Mode Detection**: The system automatically determines the generation mode based on the presence of images:
 > - **No images** → Text-to-Video mode
@@ -409,15 +457,15 @@ Generate a video from a text prompt (Text-to-Video) or from start/end frame imag
 - `duration` (number, optional): Video duration in seconds. Supported values vary by model:
   - `jimeng-video-veo3` / `jimeng-video-veo3.1`: `8` (fixed)
   - `jimeng-video-sora2`: `4` (default), `8`, `12`
-  - `jimeng-video-seedance-2.0` / `jimeng-video-seedance-2.0-fast`: `4`~`15` (any integer second, default `5`)
+  - `jimeng-video-seedance-2.0` / `jimeng-video-seedance-2.0-fast` / VIP variants: `4`~`15` (any integer second, default `5`)
   - `jimeng-video-3.5-pro`: `5` (default), `10`, `12`
   - Other models: `5` (default), `10`
 - `file_paths` (array, optional): An array of image URLs to specify the **start frame** (1st element) and **end frame** (2nd element) of the video.
 - `[file]` (file, optional): Local image files uploaded via `multipart/form-data` (up to 2) to specify the **start frame** and **end frame**. The field name can be arbitrary, e.g., `image1`.
 - `functionMode` (string, optional): Generation mode. Defaults to `"first_last_frames"`. Supported values:
   - `"first_last_frames"` (default): Standard mode, auto-detects text-to-video / image-to-video / first-last-frame based on image count.
-  - `"omni_reference"`: Omni Reference mode. Requires `jimeng-video-seedance-2.0` or `jimeng-video-seedance-2.0-fast` model. Upload files with specific field names: `image_file_1` ~ `image_file_9` (images), `video_file_1` ~ `video_file_3` (videos). Both local files and URLs are supported. Use `@field_name` in the prompt to reference materials.
-- `response_format` (string, optional): Response format, supports `url` (default) or `b64_json`.
+  - `"omni_reference"`: Omni Reference mode. Supports `jimeng-video-seedance-2.0`, `jimeng-video-seedance-2.0-fast`, `jimeng-video-seedance-2.0-vip`, and `jimeng-video-seedance-2.0-fast-vip`. Reference materials are optional; when provided, upload files with specific field names: `image_file_1` ~ `image_file_9` (images), `video_file_1` ~ `video_file_3` (videos). Both local files and URLs are supported. Use `@field_name` in the prompt to reference materials.
+- `response_format` (string, optional): Final task result format, supports `url` (default) or `b64_json`. The submit response is always a task object.
 
 > **Image Input Description**:
 > - You can provide input images via `file_paths` (URL array) or by directly uploading files.
@@ -426,7 +474,8 @@ Generate a video from a text prompt (Text-to-Video) or from start/end frame imag
 > - **Important**: Once image input is provided (image-to-video or first-last frame video), the `ratio` parameter will be ignored, and the video aspect ratio will be determined by the input image's actual ratio. The `resolution` parameter remains effective.
 
 > **Omni Reference Mode** (New):
-> - Requires `functionMode=omni_reference` and `model=jimeng-video-seedance-2.0`.
+> - Requires `functionMode=omni_reference` and a supported Seedance 2.0 model: `jimeng-video-seedance-2.0`, `jimeng-video-seedance-2.0-fast`, `jimeng-video-seedance-2.0-vip`, or `jimeng-video-seedance-2.0-fast-vip`.
+> - Reference materials are optional. If no image/video material is provided, Omni Reference mode falls back to text-only generation with the selected Seedance model.
 > - **Material Limits**:
 >   - Up to **9 images** (`image_file_1` ~ `image_file_9`)
 >   - Up to **3 videos** (`video_file_1` ~ `video_file_3`)
@@ -440,12 +489,14 @@ Generate a video from a text prompt (Text-to-Video) or from start/end frame imag
 > - **Video input** supports two methods (priority from high to low):
 >   1. **Local file upload**: `multipart/form-data` with field name `video_file_1` ~ `video_file_3` (e.g., curl `-F "video_file_1=@local.mp4"`)
 >   2. **URL in form field**: Same field name but with a URL string instead of a file (e.g., curl `-F "video_file_1=https://..."`, no `@` prefix). The server downloads the video first, then uploads it.
-> - At least 1 material (image or video) is required, up to 12 files total.
+> - Reference materials are optional; if provided, up to 12 files total are supported.
 > - In the `prompt`, use `@field_name` (e.g., `@image_file_1`, `@video_file_1`) or `@original_filename` to reference materials and describe their roles.
 > - **Note**: When using curl `-F`, the `@` symbol in `prompt` values is interpreted as a file reference. Use `--form-string` for the prompt field instead.
 > - Example prompt: `"@image_file_1 as first frame, @image_file_2 as last frame, mimic motion from @video_file_1"`
 
 **Supported Video Models**:
+- `jimeng-video-seedance-2.0-vip` - Seedance 2.0 VIP channel, China site only, supports 4~15s duration, supports Omni Reference mode
+- `jimeng-video-seedance-2.0-fast-vip` - Seedance 2.0 Fast VIP channel, China site only, supports 4~15s duration, supports Omni Reference mode
 - `jimeng-video-seedance-2.0` - Seedance 2.0, China site only, supports 4~15s duration, supports Omni Reference mode **(Latest)**
 - `jimeng-video-seedance-2.0-fast` - Seedance 2.0 Fast, China site only, supports 4~15s duration, supports Omni Reference mode, faster generation speed
 - `jimeng-video-3.5-pro` - Professional Edition v3.5, works on all sites **(Default)**
@@ -497,7 +548,8 @@ curl -X POST http://localhost:5100/v1/videos/generations \
     "{\"model\": \"jimeng-video-3.0\", \"prompt\": \"A woman dancing in a garden\", \"ratio\": \"4:3\", \"duration\": 10, \"filePaths\": [\"https://example.com/your-image.jpg\"]}"
 
 # Example 5: Omni Reference mode - all local files
-# Requires jimeng-video-seedance-2.0 model
+# Requires a Seedance 2.0 model. For VIP channel, replace model with
+# jimeng-video-seedance-2.0-vip or jimeng-video-seedance-2.0-fast-vip.
 # Note: Use --form-string for prompt containing @ references (curl -F interprets @ as file)
 curl -X POST http://localhost:5100/v1/videos/generations \
   -H "Authorization: Bearer YOUR_SESSION_ID" \
@@ -537,6 +589,8 @@ curl -X POST http://localhost:5100/v1/videos/generations \
   -F "video_file=https://example.com/reference-video.mp4"
 
 ```
+
+Each video example returns a task object. Poll `GET /v1/tasks/{id}` until `status` is `succeeded`, then read `result.data[0].url` or call `GET /v1/tasks/{id}/result`.
 
 ### Token API
 
@@ -668,10 +722,23 @@ curl -X POST http://localhost:5100/token/receive \
 
 ## 🔍 API Response Format
 
-### Image Generation Response
+### Generation Task Submit Response
 ```json
 {
+  "id": "task_550e8400-e29b-41d4-a716-446655440000",
+  "object": "task",
+  "type": "image_generation",
+  "status": "queued",
   "created": 1759058768,
+  "updated": 1759058768,
+  "result_url": "/v1/tasks/task_550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### Final Result After Task Succeeds
+```json
+{
+  "created": 1759058800,
   "data": [
     {
       "url": "https://example.com/image1.jpg"
@@ -725,6 +792,7 @@ jimeng2api/
 │   │   ├── server.ts             # Server core
 │   │   ├── logger.ts             # Logger
 │   │   ├── error-handler.ts      # Unified error handling
+│   │   ├── jobs/                 # Async task queue
 │   │   ├── smart-poller.ts       # Smart poller
 │   │   ├── aws-signature.ts      # AWS signature
 │   │   ├── environment.ts        # Environment variables
@@ -743,8 +811,13 @@ jimeng2api/
 
 ## 🔧 Core Components
 
+### TaskManager
+- Generation APIs return a task ID immediately.
+- Background workers run Jimeng generation and upstream polling.
+- Clients query `/v1/tasks/{id}` for task status and final results.
+
 ### SmartPoller
-- Adapts polling interval based on status codes.
+- Background workers adapt upstream polling interval based on status codes.
 - Multiple exit conditions to avoid invalid waiting.
 - Detailed progress tracking and logging.
 
@@ -760,7 +833,7 @@ jimeng2api/
 
 ## ⚙️ Advanced Configuration
 
-### Polling Configuration
+### Background Polling Configuration
 ```typescript
 export const POLLING_CONFIG = {
   MAX_POLL_COUNT: 900,    // Max polling attempts (15 minutes)
@@ -790,10 +863,10 @@ export const RETRY_CONFIG = {
     -   Get a fresh `sessionid` from the appropriate site.
     -   Check if the `sessionid` format is correct.
 
-3.  **Generation Timeout**
-    -   Image generation: up to 15 minutes max (may queue during peak hours).
-    -   Video generation: up to 20 minutes max.
-    -   The system will automatically handle timeouts and return an error message.
+3.  **Generation Takes Too Long**
+    -   Submit endpoints return a task immediately.
+    -   Poll `GET /v1/tasks/{id}` to check `queued`, `running`, `succeeded`, or `failed`.
+    -   If the task fails or times out, the task response includes an `error` field.
 
 4.  **Insufficient Credits**
     -   Go to the Jimeng/Dreamina official website to check your credit balance.

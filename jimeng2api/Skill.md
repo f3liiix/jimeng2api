@@ -60,7 +60,7 @@ Example prompt to user:
 - ✅ **LET THE SCRIPT USE BUILT-IN DEFAULTS** when the user did not specify:
   - ratio: 1:1
   - resolution: 2k
-  - model: jimeng-4.0
+  - model: jimeng-4.5
   - intelligent_ratio: false
 
 Rationale: Tools may “helpfully” add options (e.g., `--ratio 16:9`) that the user didn’t request, overriding script defaults. This is prohibited. Pass only the parameters the user asked for; otherwise, rely on defaults.
@@ -106,7 +106,7 @@ python scripts/generate_image.py text \
 **Parameters:**
 - `prompt` (required): Text description of the desired image
 - `--session-id`: Jimeng session ID (required)
-- `--model`: Model to use (default: `jimeng-4.0`)
+- `--model`: Model to use (default: `jimeng-4.5`)
   - Options: `jimeng-5.0`, `jimeng-4.6`, `jimeng-4.5`, `jimeng-4.1`, `jimeng-4.0`, `jimeng-3.1`, `jimeng-3.0`, `nanobanana` (international only)
 - `--ratio`: Aspect ratio (default: `1:1`)
   - Options: `1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `3:2`, `2:3`, `21:9`
@@ -197,7 +197,7 @@ python scripts/generate_image.py text \
 - Creates `/pic` folder if it doesn't exist
 - Timestamps filenames to prevent overwrites (format: `jimeng_YYYYMMDD_HHMMSS_N.png`)
 - Automatic WebP to PNG conversion for maximum compatibility
-- Downloads all generated images from API response
+- Submits an async generation task, polls task status, then downloads all generated images from the final task result
 - Supports both text-to-image and image-to-image modes
 - Handles multipart/form-data for local file uploads
 - Error handling for API calls and downloads
@@ -237,9 +237,10 @@ Text-to-Image or Image-to-Image?
     ↓
 Script executes:
     1. Calls Jimeng API (文生图 or 图生图)
-    2. Receives image URLs
-    3. Downloads all images to /pic folder
-    4. Reports file paths
+    2. Receives a task ID
+    3. Polls GET /v1/tasks/{id} until status is succeeded or failed
+    4. Downloads all images from the final result to /pic folder
+    5. Reports file paths
     ↓
     Inform user of results
         ├─ Success → Show file paths only
@@ -287,7 +288,7 @@ Script executes:
 3. **Clarify generation mode** - Determine if user wants text-to-image or image-to-image
 4. **Use intelligent ratio when applicable** - Enable when prompt contains orientation hints
 5. **Inform about output location** - Always tell users where images are saved; **DO NOT read/open/analyze images; DO NOT call `Read`/`view_image`; STOP after saving**
-6. **Handle all variations** - API returns image-urls; download and present all of them
+6. **Handle all variations** - final task results return image URLs; download and present all of them
 7. **HARD STOP — REPORT FILE PATHS ONLY** - **DO NOT READ/OPEN/ANALYZE GENERATED IMAGES. NEVER CALL ANY READ TOOL AFTER GENERATION. TASK IS COMPLETE ONCE FILES ARE SAVED.**
 
 ## Example Interactions
@@ -333,11 +334,41 @@ Claude: "✅ 已根据'竖屏'关键词自动选择9:16比例,生成星空壁纸
 
 ## API Response Format
 
-The Jimeng API returns image variations per request:
+Generation endpoints return an async task first:
 
 ```json
 {
+    "id": "task_550e8400-e29b-41d4-a716-446655440000",
+    "object": "task",
+    "type": "image_generation",
+    "status": "queued",
     "created": 1763260188,
+    "updated": 1763260188,
+    "result_url": "/v1/tasks/task_550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+Poll `GET /v1/tasks/{id}` until `status` is `succeeded`. The final `result` contains image variations:
+
+```json
+{
+    "result": {
+        "created": 1763260220,
+        "data": [
+            {"url": "https://p3-dreamina-sign.byteimg.com/...image1.png"},
+            {"url": "https://p26-dreamina-sign.byteimg.com/...image2.png"},
+            {"url": "https://p26-dreamina-sign.byteimg.com/...image3.png"},
+            {"url": "https://p3-dreamina-sign.byteimg.com/...image4.png"}
+        ]
+    }
+}
+```
+
+`GET /v1/tasks/{id}/result` returns the final result body directly:
+
+```json
+{
+    "created": 1763260220,
     "data": [
         {"url": "https://p3-dreamina-sign.byteimg.com/...image1.png"},
         {"url": "https://p26-dreamina-sign.byteimg.com/...image2.png"},

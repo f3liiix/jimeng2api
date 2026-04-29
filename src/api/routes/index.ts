@@ -13,7 +13,7 @@ export default [
                 return {
                     service: 'jimeng2api',
                     status: 'running',
-                    version: '1.6.3',
+                    version: '1.0.0',
                     description: '免费的AI图像和视频生成API服务 - 基于即梦AI的逆向工程实现',
                     documentation: 'https://github.com/f3liiix/jimeng2api',
                     endpoints: {
