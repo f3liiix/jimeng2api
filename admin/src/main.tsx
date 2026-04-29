@@ -6,9 +6,11 @@ import {
   ACCOUNT_REFRESH_INTERVAL_MS,
   adminRoutePaths,
   adminRoutes,
+  displayTypeLabels,
   getAdminRouteFromPathname,
   getTaskRefreshIntervalMs,
   mergeCreatedApiKey,
+  taskTableColumns,
   type AdminRoute,
 } from "./refresh.ts";
 
@@ -38,7 +40,9 @@ type TaskRecord = {
   type: string;
   status: string;
   api_key_id?: string | null;
+  api_key_name?: string | null;
   token_id?: string | null;
+  token_name?: string | null;
   created_at: string;
   updated_at: string;
   error?: unknown;
@@ -64,11 +68,12 @@ const tabLabels: Record<AdminRoute, string> = {
 const columnLabels: Record<string, string> = {
   actions: "操作",
   api_key: "API Key",
-  api_key_id: "API Key 标识",
+  api_key_id: "调用方",
+  api_key_name: "调用方",
   created_at: "创建时间",
   error: "错误",
   failure_count: "失败次数",
-  id: "任务标识",
+  id: "任务ID",
   last_checked_at: "最近检查时间",
   last_error: "最近错误",
   last_used_at: "最近使用时间",
@@ -76,7 +81,8 @@ const columnLabels: Record<string, string> = {
   region: "区域",
   sort_order: "排序",
   status: "状态",
-  token_id: "账号标识",
+  token_id: "账号",
+  token_name: "账号",
   type: "类型",
   updated_at: "更新时间",
 };
@@ -102,15 +108,6 @@ const regionLabels: Record<string, string> = {
   jp: "日本",
   sg: "新加坡",
   us: "美国",
-};
-
-const typeLabels: Record<string, string> = {
-  alert: "告警",
-  image: "图片",
-  images: "图片",
-  token_unhealthy: "账号异常",
-  video: "视频",
-  videos: "视频",
 };
 
 const severityLabels: Record<string, string> = {
@@ -454,14 +451,14 @@ function App() {
         {activeTab === "tasks" && (
           <Panel
             title="任务记录"
-            description="最近 200 条外部提交任务，包含使用的 API Key 与账号。"
+            description="最近 200 条外部提交任务，包含调用方与账号"
             action={
               <Button size="sm" variant="secondary" onPress={() => loadTasks()}>
                 刷新状态
               </Button>
             }
           >
-            <DataTable ariaLabel="任务记录" rows={tasks} columns={["id", "type", "status", "api_key_id", "token_id", "created_at", "updated_at", "error"]} />
+            <DataTable ariaLabel="任务记录" rows={tasks} columns={taskTableColumns} />
           </Panel>
         )}
 
@@ -663,7 +660,7 @@ function formatCell(value: unknown, column?: string) {
   if (column && timeColumns.has(column)) return formatBeijingTime(stringValue);
   if (column === "region") return regionLabels[stringValue] || stringValue;
   if (column === "status") return statusLabels[stringValue] || stringValue;
-  if (column === "type") return typeLabels[stringValue] || stringValue;
+  if (column === "type") return displayTypeLabels[stringValue] || stringValue;
   if (column === "severity") return severityLabels[stringValue] || stringValue;
   if (typeof value === "object") return translateDisplayText(JSON.stringify(value));
   return translateDisplayText(stringValue);

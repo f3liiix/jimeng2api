@@ -88,10 +88,14 @@ export default {
     "/tasks": async (request: Request) => {
       requireAdmin(request);
       const result = await query(
-        `SELECT id, object, type, status, request_payload, response_payload, error, result_url,
-                api_key_id, token_id, created_at, updated_at, finished_at
+        `SELECT tasks.id, tasks.object, tasks.type, tasks.status, tasks.request_payload,
+                tasks.response_payload, tasks.error, tasks.result_url, tasks.api_key_id,
+                api_keys.name AS api_key_name, tasks.token_id, managed_tokens.name AS token_name,
+                tasks.created_at, tasks.updated_at, tasks.finished_at
          FROM tasks
-         ORDER BY created_at DESC
+         LEFT JOIN api_keys ON api_keys.id = tasks.api_key_id
+         LEFT JOIN managed_tokens ON managed_tokens.id = tasks.token_id
+         ORDER BY tasks.created_at DESC
          LIMIT 200`,
       );
       return { data: result.rows };

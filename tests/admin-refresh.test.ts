@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { getAdminRouteFromPathname, getTaskRefreshIntervalMs, mergeCreatedApiKey } from "../admin/src/refresh.ts";
+import {
+  displayTypeLabels,
+  getAdminRouteFromPathname,
+  getTaskRefreshIntervalMs,
+  mergeCreatedApiKey,
+  taskTableColumns,
+} from "../admin/src/refresh.ts";
 
 test("admin route parser maps supported paths to pages", () => {
   assert.equal(getAdminRouteFromPathname("/admin"), "tokens");
@@ -25,6 +31,25 @@ test("task refresh interval is faster while tasks are active", () => {
 test("task refresh interval slows down when there are no active tasks", () => {
   assert.equal(getTaskRefreshIntervalMs([]), 60_000);
   assert.equal(getTaskRefreshIntervalMs([{ status: "succeeded" }, { status: "failed" }]), 60_000);
+});
+
+test("task table shows caller and account names with status next to error", () => {
+  assert.deepEqual(taskTableColumns, [
+    "id",
+    "type",
+    "api_key_name",
+    "token_name",
+    "created_at",
+    "updated_at",
+    "status",
+    "error",
+  ]);
+});
+
+test("task type identifiers are displayed in Chinese", () => {
+  assert.equal(displayTypeLabels.image_generation, "图片生成");
+  assert.equal(displayTypeLabels.image_composition, "图片合成");
+  assert.equal(displayTypeLabels.video_generation, "视频生成");
 });
 
 test("created API key is shown immediately at the top of the table", () => {
