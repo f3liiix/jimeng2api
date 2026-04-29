@@ -98,14 +98,13 @@ cp .env.example .env
 
 ```bash
 ADMIN_API_KEY=<生成一个高强度管理密钥>
-INITIAL_API_KEY=<生成一个外部调用 API Key>
 TOKEN_ENCRYPTION_KEY=<生成一个高强度 token 加密密钥>
 POSTGRES_PASSWORD=<生成一个高强度数据库密码>
 TOKEN_HEALTH_CHECK_INTERVAL_MS=300000
 TOKEN_HEALTH_FAILURE_THRESHOLD=2
 ```
 
-这些密钥必须显式配置，`.env` 不应提交到仓库。`INITIAL_API_KEY` 会写入数据库作为第一个外部调用 API Key；之后可以在管理后台继续创建新的 API Key 和托管 token。
+这些密钥必须显式配置，`.env` 不应提交到仓库。外部调用 API Key 和托管 token 可以在管理后台创建。
 
 ### 环境要求
 

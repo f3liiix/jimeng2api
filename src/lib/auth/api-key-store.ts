@@ -45,20 +45,6 @@ export class ApiKeyStore {
     };
   }
 
-  async ensureInitial(name: string, secret: string) {
-    const keyHash = hashApiKey(secret);
-    const result = await query(
-      `INSERT INTO api_keys (name, key_hash, key_ciphertext)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (key_hash) DO UPDATE
-       SET name = EXCLUDED.name,
-           key_ciphertext = EXCLUDED.key_ciphertext
-       RETURNING id, name, key_hash, key_ciphertext, status, last_used_at, created_at, revoked_at`,
-      [name, keyHash, encryptApiKeySecret(secret)],
-    );
-    return mapApiKeyRow(result.rows[0]);
-  }
-
   async findActiveBySecret(secret: string) {
     const result = await query(
       `SELECT id, name, key_hash, key_ciphertext, status, last_used_at, created_at, revoked_at

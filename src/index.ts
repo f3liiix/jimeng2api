@@ -7,7 +7,6 @@ import server from "@/lib/server.ts";
 import routes from "@/api/routes/index.ts";
 import logger from "@/lib/logger.ts";
 import { runMigrations } from "@/lib/db/migrations.ts";
-import { bootstrapAuth } from "@/lib/auth/bootstrap.ts";
 import { tokenHealthChecker } from "@/lib/tokens/health-checker.ts";
 
 const startupTime = performance.now();
@@ -22,7 +21,6 @@ const startupTime = performance.now();
   logger.info("Service name:", config.service.name);
 
   await runMigrations();
-  await bootstrapAuth();
   tokenHealthChecker.start();
   server.attachRoutes(routes);
   await server.listen();

@@ -96,14 +96,13 @@ Then edit the secrets in `.env`:
 
 ```bash
 ADMIN_API_KEY=<generate-a-strong-admin-secret>
-INITIAL_API_KEY=<generate-a-client-api-key>
 TOKEN_ENCRYPTION_KEY=<generate-a-strong-token-encryption-key>
 POSTGRES_PASSWORD=<generate-a-strong-database-password>
 TOKEN_HEALTH_CHECK_INTERVAL_MS=300000
 TOKEN_HEALTH_FAILURE_THRESHOLD=2
 ```
 
-These secrets must be configured explicitly, and `.env` should not be committed. `INITIAL_API_KEY` is stored as the first external caller API Key; more API Keys and managed tokens can be created in the admin UI.
+These secrets must be configured explicitly, and `.env` should not be committed. External caller API Keys and managed tokens can be created in the admin UI.
 
 ### Environment Requirements
 
