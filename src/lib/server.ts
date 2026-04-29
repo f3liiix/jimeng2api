@@ -4,6 +4,9 @@ import koaRange from 'koa-range';
 import koaCors from "koa2-cors";
 import koaBody from 'koa-body';
 import _ from 'lodash';
+import fs from 'fs-extra';
+import path from 'node:path';
+import mime from 'mime';
 
 import Exception from './exceptions/Exception.ts';
 import Request from './request/Request.ts';
@@ -67,6 +70,32 @@ class Server {
             } else {
                 await next();
             }
+        });
+        this.app.use(async (ctx: any, next: Function) => {
+            if (!ctx.path.startsWith('/admin') || ctx.path.startsWith('/admin/api')) {
+                await next();
+                return;
+            }
+
+            const adminDir = path.join(path.resolve(), 'dist-admin');
+            const requestedPath = ctx.path === '/admin' ? '/admin/' : ctx.path;
+            const relative = requestedPath.replace(/^\/admin\/?/, '');
+            const candidatePath = relative
+                ? path.join(adminDir, relative)
+                : path.join(adminDir, 'index.html');
+            const filePath = path.resolve(candidatePath);
+            const safePath = filePath.startsWith(path.resolve(adminDir));
+            const resolvedPath = await fs.pathExists(filePath) && (await fs.stat(filePath)).isFile()
+                && safePath ? filePath
+                : path.join(adminDir, 'index.html');
+
+            if (!(await fs.pathExists(resolvedPath))) {
+                await next();
+                return;
+            }
+
+            ctx.type = mime.getType(resolvedPath) || 'text/html';
+            ctx.body = fs.createReadStream(resolvedPath);
         });
         this.app.on("error", (err: any) => {
             // 忽略连接重试、中断、管道、取消错误

@@ -1,6 +1,9 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 
+import { isDatabaseConfigured, query } from "@/lib/db/client.ts";
+import logger from "@/lib/logger.ts";
+
 export type TaskStatus = "queued" | "running" | "succeeded" | "failed";
 export type TaskType = "image_generation" | "image_composition" | "video_generation";
 
@@ -20,6 +23,8 @@ export interface TaskRecord<T = any> {
   result_url: string;
   result?: T;
   error?: TaskError;
+  api_key_id?: string | null;
+  token_id?: string | null;
 }
 
 export interface TaskManagerOptions {
@@ -28,6 +33,12 @@ export interface TaskManagerOptions {
 }
 
 type TaskRunner<T = any> = () => Promise<T>;
+
+export interface EnqueueTaskOptions {
+  requestPayload?: any;
+  apiKeyId?: string | null;
+  tokenId?: string | null;
+}
 
 interface QueueItem<T = any> {
   task: TaskRecord<T>;
@@ -47,7 +58,7 @@ export class TaskManager {
     this.resultUrlPrefix = options.resultUrlPrefix ?? "/v1/tasks";
   }
 
-  enqueue<T>(type: TaskType, runner: TaskRunner<T>): TaskRecord<T> {
+  async enqueue<T>(type: TaskType, runner: TaskRunner<T>, options: EnqueueTaskOptions = {}): Promise<TaskRecord<T>> {
     const now = Math.floor(Date.now() / 1000);
     const id = randomUUID();
     const task: TaskRecord<T> = {
@@ -58,15 +69,49 @@ export class TaskManager {
       created: now,
       updated: now,
       result_url: `${this.resultUrlPrefix}/${id}`,
+      api_key_id: options.apiKeyId || null,
+      token_id: options.tokenId || null,
     };
 
     this.tasks.set(id, task);
+    if (isDatabaseConfigured()) {
+      await query(
+        `INSERT INTO tasks (
+          id, type, status, request_payload, result_url, api_key_id, token_id, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, to_timestamp($8), to_timestamp($9))`,
+        [
+          task.id,
+          task.type,
+          task.status,
+          JSON.stringify(options.requestPayload || {}),
+          task.result_url,
+          task.api_key_id,
+          task.token_id,
+          task.created,
+          task.updated,
+        ],
+      );
+    }
     this.queue.push({ task, runner });
     queueMicrotask(() => this.processQueue());
     return { ...task };
   }
 
-  get(id: string): TaskRecord | null {
+  async get(id: string, options: { apiKeyId?: string | null } = {}): Promise<TaskRecord | null> {
+    if (isDatabaseConfigured()) {
+      const values: any[] = [id];
+      const apiKeyFilter = options.apiKeyId ? "AND api_key_id = $2" : "";
+      if (options.apiKeyId) values.push(options.apiKeyId);
+      const result = await query(
+        `SELECT *
+         FROM tasks
+         WHERE id = $1 ${apiKeyFilter}
+         LIMIT 1`,
+        values,
+      );
+      return result.rowCount ? this.mapTaskRow(result.rows[0]) : null;
+    }
     const task = this.tasks.get(id);
     return task ? this.cloneTask(task) : null;
   }
@@ -104,19 +149,19 @@ export class TaskManager {
   private processQueue() {
     while (this.runningCount < this.concurrency && this.queue.length > 0) {
       const item = this.queue.shift()!;
-      this.runTask(item).catch(() => undefined);
+      this.runTask(item).catch((error) => logger.error(`Task ${item.task.id} failed outside normal handling:`, error));
     }
   }
 
   private async runTask<T>({ task, runner }: QueueItem<T>) {
     this.runningCount++;
-    this.updateTask(task.id, { status: "running" });
 
     try {
+      await this.updateTask(task.id, { status: "running" });
       const result = await runner();
-      this.updateTask(task.id, { status: "succeeded", result });
+      await this.updateTask(task.id, { status: "succeeded", result });
     } catch (error: any) {
-      this.updateTask(task.id, {
+      await this.updateTask(task.id, {
         status: "failed",
         error: {
           message: error?.message || "Task failed",
@@ -130,11 +175,47 @@ export class TaskManager {
     }
   }
 
-  private updateTask(id: string, patch: Partial<TaskRecord>) {
+  private async updateTask(id: string, patch: Partial<TaskRecord>) {
     const task = this.tasks.get(id);
     if (!task) return;
     Object.assign(task, patch, { updated: Math.floor(Date.now() / 1000) });
+    if (isDatabaseConfigured()) {
+      await query(
+        `UPDATE tasks
+         SET status = $1,
+             response_payload = $2::jsonb,
+             error = $3::jsonb,
+             updated_at = to_timestamp($4),
+             finished_at = CASE WHEN $1 IN ('succeeded', 'failed') THEN now() ELSE finished_at END
+         WHERE id = $5`,
+        [
+          task.status,
+          task.result === undefined ? null : JSON.stringify(task.result),
+          task.error === undefined ? null : JSON.stringify(task.error),
+          task.updated,
+          task.id,
+        ],
+      );
+    }
     this.events.emit("updated", this.cloneTask(task));
+  }
+
+  private mapTaskRow(row: any): TaskRecord {
+    const created = Math.floor(new Date(row.created_at).getTime() / 1000);
+    const updated = Math.floor(new Date(row.updated_at).getTime() / 1000);
+    return {
+      id: row.id,
+      object: "task",
+      type: row.type,
+      status: row.status,
+      created,
+      updated,
+      result_url: row.result_url,
+      result: row.response_payload || undefined,
+      error: row.error || undefined,
+      api_key_id: row.api_key_id,
+      token_id: row.token_id,
+    };
   }
 
   private cloneTask<T>(task: TaskRecord<T>): TaskRecord<T> {

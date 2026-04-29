@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jimeng2api-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-jimeng2api}
+      POSTGRES_USER: ${POSTGRES_USER:-jimeng2api}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   jimeng2api:
     image: jimeng2api:latest
     container_name: jimeng2api
@@ -6,6 +22,16 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jimeng2api}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jimeng2api}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?set ADMIN_API_KEY}
+      INITIAL_API_KEY: ${INITIAL_API_KEY:?set INITIAL_API_KEY}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?set TOKEN_ENCRYPTION_KEY}
+      TOKEN_HEALTH_CHECK_INTERVAL_MS: ${TOKEN_HEALTH_CHECK_INTERVAL_MS:-600000}
+      TOKEN_HEALTH_FAILURE_THRESHOLD: ${TOKEN_HEALTH_FAILURE_THRESHOLD:-3}
     ports:
       - "5100:5100"
     #volumes:
@@ -25,3 +51,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  postgres-data:

@@ -1,14 +1,14 @@
 import _ from 'lodash';
 
 import Request from '@/lib/request/Request.ts';
-import Response from '@/lib/response/Response.ts';
-import { tokenSplit } from '@/api/controllers/core.ts';
 import { generateVideo, DEFAULT_MODEL } from '@/api/controllers/videos.ts';
 import util from '@/lib/util.ts';
 import { taskManager } from '@/lib/jobs/task-manager.ts';
 import APIException from '@/lib/exceptions/APIException.ts';
 import EX from '@/api/consts/exceptions.ts';
 import { validateOmniReferenceMaterialLimits } from '@/api/models/video-request-validation.ts';
+import { authenticateApiKey } from '@/lib/auth/request-auth.ts';
+import { tokenPool } from '@/lib/tokens/token-pool.ts';
 
 function invalidRequest(message: string, param?: string) {
     return new APIException(EX.API_REQUEST_PARAMS_INVALID, message, {
@@ -109,10 +109,8 @@ export default {
                 }
             }
 
-            // refresh_token切分
-            const tokens = tokenSplit(request.headers.authorization);
-            // 随机挑选一个refresh_token
-            const token = _.sample(tokens);
+            const apiKey = await authenticateApiKey(request);
+            const token = await tokenPool.acquireNext();
 
             const {
                 model = DEFAULT_MODEL,
@@ -133,7 +131,7 @@ export default {
             // 兼容两种参数名格式：file_paths 和 filePaths
             const finalFilePaths = filePaths.length > 0 ? filePaths : file_paths;
 
-            return taskManager.enqueue("video_generation", async () => {
+            return await taskManager.enqueue("video_generation", async () => {
                 const generatedVideoUrl = await generateVideo(
                     model,
                     prompt,
@@ -146,7 +144,7 @@ export default {
                         httpRequest: request,
                         functionMode,
                     },
-                    token
+                    token.value
                 );
 
                 if (response_format === "b64_json") {
@@ -167,6 +165,10 @@ export default {
                         revised_prompt: prompt
                     }]
                 };
+            }, {
+                requestPayload: request.body,
+                apiKeyId: apiKey.id,
+                tokenId: token.id,
             });
         }
 

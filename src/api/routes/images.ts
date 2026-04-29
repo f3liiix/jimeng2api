@@ -4,11 +4,12 @@ import _ from "lodash";
 import Request from "@/lib/request/Request.ts";
 import { generateImages, generateImageComposition } from "@/api/controllers/images.ts";
 import { DEFAULT_IMAGE_MODEL } from "@/api/consts/common.ts";
-import { tokenSplit } from "@/api/controllers/core.ts";
 import util from "@/lib/util.ts";
 import { taskManager } from "@/lib/jobs/task-manager.ts";
 import APIException from "@/lib/exceptions/APIException.ts";
 import EX from "@/api/consts/exceptions.ts";
+import { authenticateApiKey } from "@/lib/auth/request-auth.ts";
+import { tokenPool } from "@/lib/tokens/token-pool.ts";
 
 function invalidRequest(message: string, param?: string) {
   return new APIException(EX.API_REQUEST_PARAMS_INVALID, message, {
@@ -43,8 +44,8 @@ export default {
         .validate("body.response_format", v => _.isUndefined(v) || _.isString(v))
         .validate("headers.authorization", _.isString);
 
-      const tokens = tokenSplit(request.headers.authorization);
-      const token = _.sample(tokens);
+      const apiKey = await authenticateApiKey(request);
+      const token = await tokenPool.acquireNext();
       const {
         model,
         prompt,
@@ -58,14 +59,14 @@ export default {
       const finalModel = _.defaultTo(model, DEFAULT_IMAGE_MODEL);
 
       const responseFormat = _.defaultTo(response_format, "url");
-      return taskManager.enqueue("image_generation", async () => {
+      return await taskManager.enqueue("image_generation", async () => {
         const imageUrls = await generateImages(finalModel, prompt, {
           ratio,
           resolution,
           sampleStrength,
           negativePrompt,
           intelligentRatio,
-        }, token);
+        }, token.value);
         let data = [];
         if (responseFormat == "b64_json") {
           data = (
@@ -80,6 +81,10 @@ export default {
           created: util.unixTimestamp(),
           data,
         };
+      }, {
+        requestPayload: request.body,
+        apiKeyId: apiKey.id,
+        tokenId: token.id,
       });
     },
     
@@ -153,8 +158,8 @@ export default {
         images = bodyImages.map((image: any) => _.isString(image) ? image : (image as { url: string }).url);
       }
 
-      const tokens = tokenSplit(request.headers.authorization);
-      const token = _.sample(tokens);
+      const apiKey = await authenticateApiKey(request);
+      const token = await tokenPool.acquireNext();
 
       const {
         model,
@@ -178,14 +183,14 @@ export default {
         : intelligentRatio;
 
       const responseFormat = _.defaultTo(response_format, "url");
-      return taskManager.enqueue("image_composition", async () => {
+      return await taskManager.enqueue("image_composition", async () => {
         const resultUrls = await generateImageComposition(finalModel, prompt, images, {
           ratio,
           resolution,
           sampleStrength: finalSampleStrength,
           negativePrompt,
           intelligentRatio: finalIntelligentRatio,
-        }, token);
+        }, token.value);
 
         let data = [];
         if (responseFormat == "b64_json") {
@@ -204,6 +209,10 @@ export default {
           input_images: images.length,
           composition_type: "multi_image_synthesis",
         };
+      }, {
+        requestPayload: request.body,
+        apiKeyId: apiKey.id,
+        tokenId: token.id,
       });
     },
   },

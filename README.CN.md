@@ -72,6 +72,35 @@ curl -X POST http://localhost:5100/v1/images/generations \
 > - **美国站 (us-)**: 生成的图像固定为 **1024x1024** 和 **2k** 清晰度，忽略用户传入的 ratio 和 resolution 参数
 > - **香港/日本/新加坡站 (hk-/jp-/sg-)**: 强制使用 **1k** 清晰度，但支持自定义 ratio 参数（如 16:9、4:3 等）
 
+### 多 Token 托管与 API Key
+
+新版本支持在服务端托管多个即梦/Dreamina `sessionid`，外部调用方不再直接传 `sessionid`，而是统一使用本服务签发的 API Key：
+
+```bash
+Authorization: Bearer your_client_api_key
+```
+
+服务端会从 Postgres 中的托管 token 池按 `sort_order` 顺序轮询可用 token；例如任务 1 使用 token1，任务 2 使用 token2，之后继续循环。健康检查会定时验证 token 是否可用，失效后标记为 `unhealthy` 并生成告警。
+
+管理后台地址：
+
+```text
+http://localhost:5100/admin
+```
+
+后台登录使用 `ADMIN_API_KEY`。Docker Compose 会同时启动 Postgres，并通过以下环境变量初始化：
+
+```bash
+ADMIN_API_KEY=<生成一个高强度管理密钥>
+INITIAL_API_KEY=<生成一个外部调用 API Key>
+TOKEN_ENCRYPTION_KEY=<生成一个高强度 token 加密密钥>
+POSTGRES_PASSWORD=<生成一个高强度数据库密码>
+TOKEN_HEALTH_CHECK_INTERVAL_MS=600000
+TOKEN_HEALTH_FAILURE_THRESHOLD=3
+```
+
+这些密钥必须显式配置，Compose 不会提供可用于生产的默认值。`INITIAL_API_KEY` 会写入数据库作为第一个外部调用 API Key；之后可以在管理后台继续创建新的 API Key 和托管 token。
+
 ### 环境要求
 
 - Node.js 18+

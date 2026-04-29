@@ -1,10 +1,10 @@
 import Response from '@/lib/response/Response.ts';
 import images from "./images.ts";
 import ping from "./ping.ts";
-import token from './token.js';
 import models from './models.ts';
 import videos from './videos.ts';
 import tasks from './tasks.ts';
+import admin from './admin.ts';
 
 export default [
     {
@@ -30,8 +30,8 @@ export default [
     },
     images,
     ping,
-    token,
     models,
     videos,
-    tasks
+    tasks,
+    admin
 ];

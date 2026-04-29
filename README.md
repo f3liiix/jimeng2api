@@ -70,6 +70,35 @@ curl -X POST http://localhost:5100/v1/images/generations \
 > - **US site (us-)**: Images are fixed at **1024x1024** with **2k** resolution, ignoring user-provided ratio and resolution parameters
 > - **Hong Kong/Japan/Singapore sites (hk-/jp-/sg-)**: Fixed **1k** resolution, but supports custom `ratio` values (e.g., 16:9, 4:3, etc.)
 
+### Managed Tokens and API Keys
+
+The service can now manage multiple Jimeng/Dreamina `sessionid` values server-side. External callers no longer need to send a raw `sessionid`; they call the OpenAI-compatible endpoints with an API Key issued by this service:
+
+```bash
+Authorization: Bearer your_client_api_key
+```
+
+Managed tokens are stored in Postgres and selected with round-robin order by `sort_order`: task 1 uses token1, task 2 uses token2, then the rotation wraps. A background health checker periodically validates tokens, marks expired tokens as `unhealthy`, and creates alerts.
+
+Admin UI:
+
+```text
+http://localhost:5100/admin
+```
+
+The admin UI uses `ADMIN_API_KEY`. Docker Compose starts Postgres and supports these initialization variables:
+
+```bash
+ADMIN_API_KEY=<generate-a-strong-admin-secret>
+INITIAL_API_KEY=<generate-a-client-api-key>
+TOKEN_ENCRYPTION_KEY=<generate-a-strong-token-encryption-key>
+POSTGRES_PASSWORD=<generate-a-strong-database-password>
+TOKEN_HEALTH_CHECK_INTERVAL_MS=600000
+TOKEN_HEALTH_FAILURE_THRESHOLD=3
+```
+
+These secrets must be configured explicitly; Compose does not provide production-safe defaults. `INITIAL_API_KEY` is stored as the first external caller API Key; more API Keys and managed tokens can be created in the admin UI.
+
 ### Environment Requirements
 
 - Node.js 18+
