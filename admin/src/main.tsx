@@ -256,7 +256,7 @@ function App() {
     <main className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="flex flex-col gap-7 bg-surface-secondary border-b border-border p-6 lg:border-r lg:border-b-0 lg:p-8">
         <div className="space-y-3">
-          <p className="text-xs font-semibold tracking-[0.24em] text-muted uppercase">即梦接口服务</p>
+          <p className="text-xs font-semibold tracking-[0.24em] text-muted uppercase">Jimeng2API</p>
           <h1 className="text-4xl leading-none font-semibold tracking-tighter text-foreground">管理控制台</h1>
         </div>
 

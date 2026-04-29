@@ -653,6 +653,18 @@ export function tokenSplit(authorization: string) {
 /**
  * 获取Token存活状态
  */
+export function isAccountInfoLive(result: any) {
+  if (!result || typeof result !== "object") return false;
+  const accountInfo = result.data && typeof result.data === "object" ? result.data : result;
+  return Boolean(
+    accountInfo.user_id ||
+    accountInfo.app_id ||
+    accountInfo.app_user_info ||
+    accountInfo.avatar_url ||
+    (Array.isArray(accountInfo.connects) && accountInfo.connects.length > 0)
+  );
+}
+
 export async function getTokenLiveStatus(refreshToken: string) {
   try {
     const result = await request(
@@ -666,7 +678,7 @@ export async function getTokenLiveStatus(refreshToken: string) {
       }
     );
     // request 内部已调用 checkResult，直接使用返回值
-    return !!result?.user_id;
+    return isAccountInfoLive(result);
   } catch (err) {
     return false;
   }

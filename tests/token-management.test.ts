@@ -13,6 +13,7 @@ import {
   selectNextToken,
   type TokenCandidate,
 } from "../src/lib/tokens/token-pool.ts";
+import { isAccountInfoLive } from "../src/api/controllers/core.ts";
 
 test("api key secrets are hashed and verified without storing plaintext", () => {
   const secret = createApiKeySecret();
@@ -54,4 +55,29 @@ test("round robin selection advances from the last token and wraps", () => {
   assert.equal(selectNextToken(tokens, "token-1")?.id, "token-2");
   assert.equal(selectNextToken(tokens, "token-3")?.id, "token-1");
   assert.equal(selectNextToken(tokens, "unknown")?.id, "token-1");
+});
+
+test("account info response without user_id is treated as live when profile data exists", () => {
+  assert.equal(
+    isAccountInfoLive({
+      app_id: 513695,
+      app_user_info: { contact_email: "" },
+      avatar_url: "https://example.com/avatar.jpeg",
+      connects: [{ platform: "aweme_v2" }],
+    }),
+    true,
+  );
+});
+
+test("wrapped account info response is treated as live when profile data exists", () => {
+  assert.equal(
+    isAccountInfoLive({
+      data: {
+        app_id: 513695,
+        app_user_info: { contact_email: "" },
+        avatar_url: "https://example.com/avatar.jpeg",
+      },
+    }),
+    true,
+  );
 });
