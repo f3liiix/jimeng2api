@@ -1,7 +1,8 @@
-import React, { FormEvent, useEffect, useMemo, useState } from "react";
+import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Button, Card, Chip, Input, Label, ListBox, Select, Table, TextField } from "@heroui/react";
 import "./styles.css";
+import { ACCOUNT_REFRESH_INTERVAL_MS, getTaskRefreshIntervalMs } from "./refresh.ts";
 
 type TokenRecord = {
   id: string;
@@ -125,7 +126,6 @@ function App() {
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
-  const [status, setStatus] = useState("");
   const [newSecret, setNewSecret] = useState("");
   const [editingToken, setEditingToken] = useState<TokenRecord | null>(null);
 
@@ -134,7 +134,7 @@ function App() {
     "X-Admin-Key": adminKey,
   }), [adminKey]);
 
-  async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const api = useCallback(async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`/admin/api${path}`, {
       ...options,
       headers: {
@@ -145,27 +145,36 @@ function App() {
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body?.error?.message || `请求失败：${response.status}`);
     return body;
-  }
+  }, [headers]);
 
-  async function refresh() {
+  const loadTokens = useCallback(async () => {
+    const body = await api<{ data: TokenRecord[] }>("/tokens");
+    setTokens(body.data);
+  }, [api]);
+
+  const loadApiKeys = useCallback(async () => {
+    const body = await api<{ data: ApiKeyRecord[] }>("/api-keys");
+    setApiKeys(body.data);
+  }, [api]);
+
+  const loadTasks = useCallback(async () => {
+    const body = await api<{ data: TaskRecord[] }>("/tasks");
+    setTasks(body.data);
+  }, [api]);
+
+  const loadAlerts = useCallback(async () => {
+    const body = await api<{ data: AlertRecord[] }>("/alerts");
+    setAlerts(body.data);
+  }, [api]);
+
+  const loadInitialData = useCallback(async () => {
+    await Promise.all([loadTokens(), loadApiKeys(), loadTasks(), loadAlerts()]);
+  }, [loadAlerts, loadApiKeys, loadTasks, loadTokens]);
+
+  useEffect(() => {
     if (adminKey) localStorage.setItem("adminKey", adminKey);
-    setStatus("正在刷新数据...");
-    try {
-      const [tokenBody, keyBody, taskBody, alertBody] = await Promise.all([
-        api<{ data: TokenRecord[] }>("/tokens"),
-        api<{ data: ApiKeyRecord[] }>("/api-keys"),
-        api<{ data: TaskRecord[] }>("/tasks"),
-        api<{ data: AlertRecord[] }>("/alerts"),
-      ]);
-      setTokens(tokenBody.data);
-      setApiKeys(keyBody.data);
-      setTasks(taskBody.data);
-      setAlerts(alertBody.data);
-      setStatus("数据已更新");
-    } catch (error: any) {
-      setStatus(translateDisplayText(error.message));
-    }
-  }
+    else localStorage.removeItem("adminKey");
+  }, [adminKey]);
 
   useEffect(() => {
     fetch("/admin/api/config")
@@ -173,9 +182,23 @@ function App() {
       .then((config) => setAdminAuthDisabled(!!config.admin_auth_disabled))
       .catch(() => undefined)
       .finally(() => {
-        refresh();
+        loadInitialData().catch((error) => console.error(translateDisplayText(error.message)));
       });
-  }, []);
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      loadTokens().catch((error) => console.error(translateDisplayText(error.message)));
+    }, ACCOUNT_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [loadTokens]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      loadTasks().catch((error) => console.error(translateDisplayText(error.message)));
+    }, getTaskRefreshIntervalMs(tasks));
+    return () => window.clearInterval(timer);
+  }, [loadTasks, tasks]);
 
   async function createToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -191,7 +214,7 @@ function App() {
       }),
     });
     event.currentTarget.reset();
-    await refresh();
+    await loadTokens();
   }
 
   async function createApiKey(event: FormEvent<HTMLFormElement>) {
@@ -203,12 +226,12 @@ function App() {
     });
     setNewSecret(body.secret);
     event.currentTarget.reset();
-    await refresh();
+    await loadApiKeys();
   }
 
   async function resolveAlert(id: string) {
     await api(`/alerts/${id}/resolve`, { method: "POST", body: "{}" });
-    await refresh();
+    await loadAlerts();
   }
 
   async function updateTokenStatus(id: string, status: string) {
@@ -216,7 +239,7 @@ function App() {
       method: "PUT",
       body: JSON.stringify({ status }),
     });
-    await refresh();
+    await loadTokens();
   }
 
   async function updateTokenDetails(event: FormEvent<HTMLFormElement>) {
@@ -235,17 +258,17 @@ function App() {
       }),
     });
     setEditingToken(null);
-    await refresh();
+    await loadTokens();
   }
 
   async function deleteToken(id: string) {
     await api(`/tokens/${id}`, { method: "DELETE" });
-    await refresh();
+    await loadTokens();
   }
 
   async function revokeApiKey(id: string) {
     await api(`/api-keys/${id}`, { method: "DELETE" });
-    await refresh();
+    await loadApiKeys();
   }
 
   const openAlerts = alerts.filter((alert) => alert.status === "open").length;
@@ -267,10 +290,6 @@ function App() {
           </TextField>
         )}
 
-        <Button className="justify-center" onPress={refresh}>
-          刷新数据
-        </Button>
-
         <nav className="grid gap-2">
           {tabs.map((tab) => (
             <Button
@@ -284,12 +303,6 @@ function App() {
           ))}
         </nav>
 
-        <Card className="mt-auto">
-          <Card.Header className="gap-1">
-            <Card.Description>状态</Card.Description>
-            <Card.Title className="text-sm">{status || "等待刷新"}</Card.Title>
-          </Card.Header>
-        </Card>
       </aside>
 
       <section className="min-w-0 bg-background p-5 md:p-8">
