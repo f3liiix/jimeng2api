@@ -2,6 +2,7 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "rea
 import { createRoot } from "react-dom/client";
 import { Button, Card, Chip, Input, Label, ListBox, Select, Table, TextField } from "@heroui/react";
 import "./styles.css";
+import { copyText } from "./clipboard.ts";
 import { ApiDocsPage } from "./components/ApiDocsPage.tsx";
 import {
   ACCOUNT_REFRESH_INTERVAL_MS,
@@ -602,14 +603,8 @@ function ApiKeyCell({ value }: { value: string }) {
   }
 
   async function copyApiKey() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyStatus("copied");
-      window.setTimeout(() => setCopyStatus("idle"), 1500);
-    } catch {
-      setCopyStatus("failed");
-      window.setTimeout(() => setCopyStatus("idle"), 1500);
-    }
+    setCopyStatus((await copyText(value)) ? "copied" : "failed");
+    window.setTimeout(() => setCopyStatus("idle"), 1500);
   }
 
   return (

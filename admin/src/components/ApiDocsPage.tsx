@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button, Card } from "@heroui/react";
+import { copyText } from "../clipboard.ts";
 import apiDocsMarkdown from "../docs/api-docs.md?raw";
 
 type CopyState = "idle" | "copied" | "failed";
@@ -68,12 +69,7 @@ function CopyButton({ value, idleLabel = "复制", size }: { value: string; idle
   const [copyState, setCopyState] = useState<CopyState>("idle");
 
   async function copyValue() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyState("copied");
-    } catch {
-      setCopyState("failed");
-    }
+    setCopyState((await copyText(value)) ? "copied" : "failed");
     window.setTimeout(() => setCopyState("idle"), 1500);
   }
 
