@@ -838,7 +838,7 @@ export async function generateVideo(
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
   // 使用 SmartPoller 进行智能轮询
-  const maxPollCount = 900; // 增加轮询次数，支持更长的生成时间
+  const maxPollCount = 300; // 最大查询次数，实际仍受60分钟超时限制
   let pollAttempts = 0;
 
   const poller = new SmartPoller({
