@@ -127,3 +127,10 @@ test("admin API docs describe defaults and task errors accurately", () => {
   assert.match(docs, /`task_not_found`/);
   assert.match(docs, /仅 `jimeng-video-3\.0` 和 `jimeng-video-3\.0-fast` 生效/);
 });
+
+test("admin API docs use the LAN base URL consistently", () => {
+  const docs = readFileSync(new URL("../admin/src/docs/api-docs.md", import.meta.url), "utf8");
+
+  assert.match(docs, /Base URL: `http:\/\/192\.168\.5\.10:5100`/);
+  assert.equal(docs.includes("http://localhost:5100"), false);
+});

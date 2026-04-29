@@ -4,14 +4,14 @@
 
 ## 基础信息
 
-- Base URL: `http://localhost:5100`
+- Base URL: `http://192.168.5.10:5100`
 - 认证方式: 在请求头中传入 `Authorization: Bearer <API_KEY>`
 - JSON 请求需要设置 `Content-Type: application/json`
 - 文件上传请求使用 `multipart/form-data`，不要手动设置 `Content-Type`
 - 任务 ID 为标准 UUID 字符串，例如 `550e8400-e29b-41d4-a716-446655440000`
 
 ```bash
-curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
+curl http://192.168.5.10:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -24,7 +24,7 @@ curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
 
 ```bash
 # 1. 提交视频生成任务
-curl -X POST http://localhost:5100/v1/videos/generations \
+curl -X POST http://192.168.5.10:5100/v1/videos/generations \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
@@ -34,11 +34,11 @@ curl -X POST http://localhost:5100/v1/videos/generations \
   }'
 
 # 2. 查询任务状态
-curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
+curl http://192.168.5.10:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer YOUR_API_KEY"
 
 # 3. 获取最终结果
-curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000/result \
+curl http://192.168.5.10:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000/result \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -96,7 +96,7 @@ curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000/result 
 文生视频示例：
 
 ```bash
-curl -X POST http://localhost:5100/v1/videos/generations \
+curl -X POST http://192.168.5.10:5100/v1/videos/generations \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
@@ -112,7 +112,7 @@ curl -X POST http://localhost:5100/v1/videos/generations \
 首帧图片上传示例：
 
 ```bash
-curl -X POST http://localhost:5100/v1/videos/generations \
+curl -X POST http://192.168.5.10:5100/v1/videos/generations \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -F "prompt=让画面中的人物自然挥手" \
   -F "model=jimeng-video-seedance-2.0-fast-vip" \
@@ -123,7 +123,7 @@ curl -X POST http://localhost:5100/v1/videos/generations \
 全能参考模式示例：
 
 ```bash
-curl -X POST http://localhost:5100/v1/videos/generations \
+curl -X POST http://192.168.5.10:5100/v1/videos/generations \
   -H "Authorization: Bearer YOUR_API_KEY" \
   --form-string "prompt=@image_file_1作为首帧，运动动作参考@video_file_1" \
   -F "model=jimeng-video-seedance-2.0-fast-vip" \
@@ -140,7 +140,7 @@ curl -X POST http://localhost:5100/v1/videos/generations \
 `GET /v1/tasks/{id}`
 
 ```bash
-curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
+curl http://192.168.5.10:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
@@ -168,7 +168,7 @@ curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000 \
 `GET /v1/tasks/{id}/result`
 
 ```bash
-curl http://localhost:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000/result \
+curl http://192.168.5.10:5100/v1/tasks/550e8400-e29b-41d4-a716-446655440000/result \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
