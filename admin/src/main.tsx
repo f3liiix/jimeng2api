@@ -453,6 +453,11 @@ function App() {
 
         {activeTab === "tasks" && (
           <Panel title="任务记录" description="最近 200 条外部提交任务，包含使用的 API Key 与账号。">
+            <div className="flex justify-end">
+              <Button size="sm" variant="secondary" onPress={() => loadTasks()}>
+                刷新状态
+              </Button>
+            </div>
             <DataTable ariaLabel="任务记录" rows={tasks} columns={["id", "type", "status", "api_key_id", "token_id", "created_at", "updated_at", "error"]} />
           </Panel>
         )}
@@ -465,7 +470,7 @@ function App() {
                   <Card.Content className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                   <div>
                     <strong className="text-foreground">{alert.message}</strong>
-                    <p className="mt-1 text-sm text-muted">{formatCell(alert.type, "type")} · {formatCell(alert.severity, "severity")} · {formatCell(alert.status, "status")}</p>
+                    <p className="mt-1 text-sm text-muted">{formatCell(alert.type, "type")} · {formatCell(alert.severity, "severity")} · {formatCell(alert.status, "status")} · 发生时间：{formatCell(alert.created_at, "created_at")}</p>
                   </div>
                   {alert.status === "open" && (
                     <Button variant="danger-soft" onPress={() => resolveAlert(alert.id)}>
