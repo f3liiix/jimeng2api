@@ -102,9 +102,15 @@ TOKEN_ENCRYPTION_KEY=<生成一个高强度 token 加密密钥>
 POSTGRES_PASSWORD=<生成一个高强度数据库密码>
 TOKEN_HEALTH_CHECK_INTERVAL_MS=300000
 TOKEN_HEALTH_FAILURE_THRESHOLD=2
+DINGTALK_WEBHOOK_URL=<可选，钉钉自定义机器人 Webhook>
+DINGTALK_AT_MOBILES=<可选，多个手机号用英文逗号分隔>
+DINGTALK_AT_USER_IDS=<可选，多个用户 ID 用英文逗号分隔>
+DINGTALK_AT_ALL=false
 ```
 
 这些密钥必须显式配置，`.env` 不应提交到仓库。外部调用 API Key 和托管 token 可以在管理后台创建。
+
+配置 `DINGTALK_WEBHOOK_URL` 后，托管 token 健康检查首次生成 open 告警时会通过钉钉自定义机器人发送 Markdown 提醒；同一个账号持续异常时不会重复刷屏。`DINGTALK_AT_MOBILES`、`DINGTALK_AT_USER_IDS` 和 `DINGTALK_AT_ALL` 用于控制是否 @ 指定成员或全员。
 
 ### 环境要求
 

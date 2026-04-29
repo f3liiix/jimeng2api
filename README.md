@@ -100,9 +100,15 @@ TOKEN_ENCRYPTION_KEY=<generate-a-strong-token-encryption-key>
 POSTGRES_PASSWORD=<generate-a-strong-database-password>
 TOKEN_HEALTH_CHECK_INTERVAL_MS=300000
 TOKEN_HEALTH_FAILURE_THRESHOLD=2
+DINGTALK_WEBHOOK_URL=<optional DingTalk custom robot webhook>
+DINGTALK_AT_MOBILES=<optional comma-separated mobile numbers>
+DINGTALK_AT_USER_IDS=<optional comma-separated DingTalk user IDs>
+DINGTALK_AT_ALL=false
 ```
 
 These secrets must be configured explicitly, and `.env` should not be committed. External caller API Keys and managed tokens can be created in the admin UI.
+
+When `DINGTALK_WEBHOOK_URL` is configured, the managed-token health checker sends a DingTalk Markdown notification when it first creates an open alert. Continued failures for the same open alert do not send repeated notifications. Use `DINGTALK_AT_MOBILES`, `DINGTALK_AT_USER_IDS`, and `DINGTALK_AT_ALL` to control mentions.
 
 ### Environment Requirements
 
