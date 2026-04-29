@@ -33,6 +33,10 @@ export interface AcquiredToken {
   region: ManagedTokenRegion;
 }
 
+export interface AcquireNextOptions {
+  excludeTokenIds?: string[];
+}
+
 const ROTATION_SCOPE = "default";
 
 function getEncryptionKey(secret = process.env.TOKEN_ENCRYPTION_KEY || process.env.APP_SECRET) {
@@ -77,9 +81,16 @@ export function formatManagedToken(input: {
   return input.proxyUrl ? `${input.proxyUrl}@${token}` : token;
 }
 
-export function selectNextToken<T extends TokenCandidate>(tokens: T[], lastTokenId: string | null): T | null {
-  if (!tokens.length) return null;
-  const sorted = [...tokens].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+export function selectNextToken<T extends TokenCandidate>(
+  tokens: T[],
+  lastTokenId: string | null,
+  options: AcquireNextOptions = {},
+): T | null {
+  const excluded = new Set(options.excludeTokenIds || []);
+  const sorted = [...tokens]
+    .filter((token) => !excluded.has(token.id))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+  if (!sorted.length) return null;
   const lastIndex = lastTokenId ? sorted.findIndex((token) => token.id === lastTokenId) : -1;
   return sorted[(lastIndex + 1) % sorted.length];
 }
@@ -196,7 +207,7 @@ export class TokenPool {
     await query("DELETE FROM managed_tokens WHERE id = $1", [id]);
   }
 
-  async acquireNext(): Promise<AcquiredToken> {
+  async acquireNext(options: AcquireNextOptions = {}): Promise<AcquiredToken> {
     return transaction(async (client) => {
       await client.query(
         `INSERT INTO token_rotation_state (scope)
@@ -212,7 +223,7 @@ export class TokenPool {
         [ROTATION_SCOPE],
       );
       const candidates = await loadSelectableTokens(client);
-      const selected = selectNextToken(candidates, state.rows[0]?.last_token_id || null);
+      const selected = selectNextToken(candidates, state.rows[0]?.last_token_id || null, options);
       if (!selected) throw new Error("No healthy managed tokens available");
 
       await client.query(

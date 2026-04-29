@@ -10,6 +10,7 @@ import APIException from "@/lib/exceptions/APIException.ts";
 import EX from "@/api/consts/exceptions.ts";
 import { authenticateApiKey } from "@/lib/auth/request-auth.ts";
 import { tokenPool } from "@/lib/tokens/token-pool.ts";
+import { runWithTokenRetry } from "@/lib/tokens/token-retry.ts";
 
 function invalidRequest(message: string, param?: string) {
   return new APIException(EX.API_REQUEST_PARAMS_INVALID, message, {
@@ -59,28 +60,35 @@ export default {
       const finalModel = _.defaultTo(model, DEFAULT_IMAGE_MODEL);
 
       const responseFormat = _.defaultTo(response_format, "url");
-      return await taskManager.enqueue("image_generation", async () => {
-        const imageUrls = await generateImages(finalModel, prompt, {
-          ratio,
-          resolution,
-          sampleStrength,
-          negativePrompt,
-          intelligentRatio,
-        }, token.value);
-        let data = [];
-        if (responseFormat == "b64_json") {
-          data = (
-            await Promise.all(imageUrls.map((url) => util.fetchFileBASE64(url)))
-          ).map((b64) => ({ b64_json: b64 }));
-        } else {
-          data = imageUrls.map((url) => ({
-            url,
-          }));
-        }
-        return {
-          created: util.unixTimestamp(),
-          data,
-        };
+      return await taskManager.enqueue("image_generation", async ({ updateTokenId }) => {
+        return await runWithTokenRetry({
+          initialToken: token,
+          acquireNextToken: (options) => tokenPool.acquireNext(options),
+          onTokenChange: (retryToken) => updateTokenId(retryToken.id),
+          run: async (currentToken) => {
+            const imageUrls = await generateImages(finalModel, prompt, {
+              ratio,
+              resolution,
+              sampleStrength,
+              negativePrompt,
+              intelligentRatio,
+            }, currentToken.value);
+            let data = [];
+            if (responseFormat == "b64_json") {
+              data = (
+                await Promise.all(imageUrls.map((url) => util.fetchFileBASE64(url)))
+              ).map((b64) => ({ b64_json: b64 }));
+            } else {
+              data = imageUrls.map((url) => ({
+                url,
+              }));
+            }
+            return {
+              created: util.unixTimestamp(),
+              data,
+            };
+          },
+        });
       }, {
         requestPayload: request.body,
         apiKeyId: apiKey.id,
@@ -183,32 +191,39 @@ export default {
         : intelligentRatio;
 
       const responseFormat = _.defaultTo(response_format, "url");
-      return await taskManager.enqueue("image_composition", async () => {
-        const resultUrls = await generateImageComposition(finalModel, prompt, images, {
-          ratio,
-          resolution,
-          sampleStrength: finalSampleStrength,
-          negativePrompt,
-          intelligentRatio: finalIntelligentRatio,
-        }, token.value);
+      return await taskManager.enqueue("image_composition", async ({ updateTokenId }) => {
+        return await runWithTokenRetry({
+          initialToken: token,
+          acquireNextToken: (options) => tokenPool.acquireNext(options),
+          onTokenChange: (retryToken) => updateTokenId(retryToken.id),
+          run: async (currentToken) => {
+            const resultUrls = await generateImageComposition(finalModel, prompt, images, {
+              ratio,
+              resolution,
+              sampleStrength: finalSampleStrength,
+              negativePrompt,
+              intelligentRatio: finalIntelligentRatio,
+            }, currentToken.value);
 
-        let data = [];
-        if (responseFormat == "b64_json") {
-          data = (
-            await Promise.all(resultUrls.map((url) => util.fetchFileBASE64(url)))
-          ).map((b64) => ({ b64_json: b64 }));
-        } else {
-          data = resultUrls.map((url) => ({
-            url,
-          }));
-        }
+            let data = [];
+            if (responseFormat == "b64_json") {
+              data = (
+                await Promise.all(resultUrls.map((url) => util.fetchFileBASE64(url)))
+              ).map((b64) => ({ b64_json: b64 }));
+            } else {
+              data = resultUrls.map((url) => ({
+                url,
+              }));
+            }
 
-        return {
-          created: util.unixTimestamp(),
-          data,
-          input_images: images.length,
-          composition_type: "multi_image_synthesis",
-        };
+            return {
+              created: util.unixTimestamp(),
+              data,
+              input_images: images.length,
+              composition_type: "multi_image_synthesis",
+            };
+          },
+        });
       }, {
         requestPayload: request.body,
         apiKeyId: apiKey.id,

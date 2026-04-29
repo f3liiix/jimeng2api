@@ -369,7 +369,7 @@ function App() {
         </div>
 
         {activeTab === "tokens" && (
-          <Panel title="账号管理" description="健康账号会按排序值顺序轮询，未检查账号会参与首次分配。">
+          <Panel title="账号管理" description="健康账号会按排序值顺序轮询">
             <form className="grid gap-3 xl:grid-cols-[1fr_1fr_120px_1fr_120px_auto]" onSubmit={createToken}>
               <HeroText name="name" label="名称" placeholder="账号名称" required />
               <HeroText name="token" label="Session ID" placeholder="请输入 Session ID" required />

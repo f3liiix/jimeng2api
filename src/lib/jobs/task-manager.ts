@@ -32,7 +32,12 @@ export interface TaskManagerOptions {
   resultUrlPrefix?: string;
 }
 
-type TaskRunner<T = any> = () => Promise<T>;
+export interface TaskRunnerContext<T = any> {
+  task: TaskRecord<T>;
+  updateTokenId: (tokenId: string) => Promise<void>;
+}
+
+type TaskRunner<T = any> = (context: TaskRunnerContext<T>) => Promise<T>;
 
 export interface EnqueueTaskOptions {
   requestPayload?: any;
@@ -158,7 +163,12 @@ export class TaskManager {
 
     try {
       await this.updateTask(task.id, { status: "running" });
-      const result = await runner();
+      const result = await runner({
+        task: this.cloneTask(task),
+        updateTokenId: async (tokenId: string) => {
+          await this.updateTask(task.id, { token_id: tokenId });
+        },
+      });
       await this.updateTask(task.id, { status: "succeeded", result });
     } catch (error: any) {
       await this.updateTask(task.id, {
@@ -185,13 +195,15 @@ export class TaskManager {
          SET status = $1,
              response_payload = $2::jsonb,
              error = $3::jsonb,
-             updated_at = to_timestamp($4),
+             token_id = $4,
+             updated_at = to_timestamp($5),
              finished_at = CASE WHEN $1 IN ('succeeded', 'failed') THEN now() ELSE finished_at END
-         WHERE id = $5`,
+         WHERE id = $6`,
         [
           task.status,
           task.result === undefined ? null : JSON.stringify(task.result),
           task.error === undefined ? null : JSON.stringify(task.error),
+          task.token_id || null,
           task.updated,
           task.id,
         ],

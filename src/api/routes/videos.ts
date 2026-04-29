@@ -9,6 +9,7 @@ import EX from '@/api/consts/exceptions.ts';
 import { validateOmniReferenceMaterialLimits } from '@/api/models/video-request-validation.ts';
 import { authenticateApiKey } from '@/lib/auth/request-auth.ts';
 import { tokenPool } from '@/lib/tokens/token-pool.ts';
+import { runWithTokenRetry } from '@/lib/tokens/token-retry.ts';
 
 function invalidRequest(message: string, param?: string) {
     return new APIException(EX.API_REQUEST_PARAMS_INVALID, message, {
@@ -131,40 +132,47 @@ export default {
             // 兼容两种参数名格式：file_paths 和 filePaths
             const finalFilePaths = filePaths.length > 0 ? filePaths : file_paths;
 
-            return await taskManager.enqueue("video_generation", async () => {
-                const generatedVideoUrl = await generateVideo(
-                    model,
-                    prompt,
-                    {
-                        ratio,
-                        resolution,
-                        duration: finalDuration,
-                        filePaths: finalFilePaths,
-                        files: request.files,
-                        httpRequest: request,
-                        functionMode,
+            return await taskManager.enqueue("video_generation", async ({ updateTokenId }) => {
+                return await runWithTokenRetry({
+                    initialToken: token,
+                    acquireNextToken: (options) => tokenPool.acquireNext(options),
+                    onTokenChange: (retryToken) => updateTokenId(retryToken.id),
+                    run: async (currentToken) => {
+                        const generatedVideoUrl = await generateVideo(
+                            model,
+                            prompt,
+                            {
+                                ratio,
+                                resolution,
+                                duration: finalDuration,
+                                filePaths: finalFilePaths,
+                                files: request.files,
+                                httpRequest: request,
+                                functionMode,
+                            },
+                            currentToken.value
+                        );
+
+                        if (response_format === "b64_json") {
+                            const videoBase64 = await util.fetchFileBASE64(generatedVideoUrl);
+                            return {
+                                created: util.unixTimestamp(),
+                                data: [{
+                                    b64_json: videoBase64,
+                                    revised_prompt: prompt
+                                }]
+                            };
+                        }
+
+                        return {
+                            created: util.unixTimestamp(),
+                            data: [{
+                                url: generatedVideoUrl,
+                                revised_prompt: prompt
+                            }]
+                        };
                     },
-                    token.value
-                );
-
-                if (response_format === "b64_json") {
-                    const videoBase64 = await util.fetchFileBASE64(generatedVideoUrl);
-                    return {
-                        created: util.unixTimestamp(),
-                        data: [{
-                            b64_json: videoBase64,
-                            revised_prompt: prompt
-                        }]
-                    };
-                }
-
-                return {
-                    created: util.unixTimestamp(),
-                    data: [{
-                        url: generatedVideoUrl,
-                        revised_prompt: prompt
-                    }]
-                };
+                });
             }, {
                 requestPayload: request.body,
                 apiKeyId: apiKey.id,

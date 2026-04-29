@@ -13,7 +13,10 @@ import {
   selectNextToken,
   type TokenCandidate,
 } from "../src/lib/tokens/token-pool.ts";
+import APIException from "../src/lib/exceptions/APIException.ts";
+import EX from "../src/api/consts/exceptions.ts";
 import { isAccountInfoLive } from "../src/api/controllers/core.ts";
+import { isTokenExpiredError } from "../src/lib/tokens/token-retry.ts";
 
 test("api key secrets are hashed and verified without storing plaintext", () => {
   const secret = createApiKeySecret();
@@ -55,6 +58,24 @@ test("round robin selection advances from the last token and wraps", () => {
   assert.equal(selectNextToken(tokens, "token-1")?.id, "token-2");
   assert.equal(selectNextToken(tokens, "token-3")?.id, "token-1");
   assert.equal(selectNextToken(tokens, "unknown")?.id, "token-1");
+});
+
+test("round robin selection can exclude failed tokens", () => {
+  const tokens: TokenCandidate[] = [
+    { id: "token-1", sortOrder: 1 },
+    { id: "token-2", sortOrder: 2 },
+    { id: "token-3", sortOrder: 3 },
+  ];
+
+  assert.equal(selectNextToken(tokens, "token-1", { excludeTokenIds: ["token-2"] })?.id, "token-3");
+  assert.equal(selectNextToken(tokens, "token-3", { excludeTokenIds: ["token-1"] })?.id, "token-2");
+  assert.equal(selectNextToken(tokens, "token-1", { excludeTokenIds: ["token-1", "token-2", "token-3"] }), null);
+});
+
+test("token expiry detection only matches session expiry errors", () => {
+  assert.equal(isTokenExpiredError(new APIException(EX.API_TOKEN_EXPIRES, "[登录失效]: session expired")), true);
+  assert.equal(isTokenExpiredError(new APIException(EX.API_CONTENT_FILTERED, "[内容违规]: risk not pass")), false);
+  assert.equal(isTokenExpiredError(new APIException(EX.API_IMAGE_GENERATION_INSUFFICIENT_POINTS, "[积分不足]")), false);
 });
 
 test("account info response without user_id is treated as live when profile data exists", () => {
