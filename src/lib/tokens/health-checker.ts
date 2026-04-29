@@ -4,7 +4,8 @@ import logger from "@/lib/logger.ts";
 import { alertStore } from "@/lib/alerts/alert-store.ts";
 import { formatManagedToken, tokenPool } from "@/lib/tokens/token-pool.ts";
 
-const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
+const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
+const DEFAULT_FAILURE_THRESHOLD = 2;
 
 export class TokenHealthChecker {
   private timer: NodeJS.Timeout | null = null;
@@ -47,7 +48,7 @@ export class TokenHealthChecker {
   }
 
   private async checkOne(token: Awaited<ReturnType<typeof tokenPool.list>>[number]) {
-    const failureThreshold = Math.max(1, Number(process.env.TOKEN_HEALTH_FAILURE_THRESHOLD || 3));
+    const failureThreshold = Math.max(1, Number(process.env.TOKEN_HEALTH_FAILURE_THRESHOLD || DEFAULT_FAILURE_THRESHOLD));
     try {
       const live = await getTokenLiveStatus(formatManagedToken(token));
       if (live) {
@@ -65,24 +66,24 @@ export class TokenHealthChecker {
       await tokenPool.update(token.id, {
         status: failureCount >= failureThreshold ? "unhealthy" : token.status,
         lastCheckedAt: new Date(),
-        lastError: "Token 存活检查未通过",
+        lastError: "账号验证未通过",
         failureCount,
       });
       if (failureCount >= failureThreshold) {
-        await alertStore.openTokenAlert(token.id, `${token.name} 已连续 ${failureCount} 次检查失败，请更新 sessionid`);
+        await alertStore.openTokenAlert(token.id, `${token.name} 已连续 ${failureCount} 次检查失败，请更新 Session ID`);
       }
     } catch (error: any) {
       const failureCount = token.failureCount + 1;
       await tokenPool.update(token.id, {
         status: failureCount >= failureThreshold ? "unhealthy" : token.status,
         lastCheckedAt: new Date(),
-        lastError: error?.message || "Token 健康检查异常",
+        lastError: error?.message || "账号验证异常",
         failureCount,
       });
       if (failureCount >= failureThreshold) {
         await alertStore.openTokenAlert(
           token.id,
-          `${token.name} 已连续 ${failureCount} 次健康检查失败: ${error?.message || "unknown error"}`,
+          `${token.name} 已连续 ${failureCount} 次验证失败: ${error?.message || "未知错误"}`,
         );
       }
     }

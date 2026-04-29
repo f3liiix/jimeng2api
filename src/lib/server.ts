@@ -16,6 +16,7 @@ import EX from './consts/exceptions.ts';
 import logger from './logger.ts';
 import config from './config.ts';
 import { parseByteSize, parseJsonBody } from './request/json-body-parser.ts';
+import { isAdminApiPath } from './admin-static-path.ts';
 
 class Server {
 
@@ -72,7 +73,7 @@ class Server {
             }
         });
         this.app.use(async (ctx: any, next: Function) => {
-            if (!ctx.path.startsWith('/admin') || ctx.path.startsWith('/admin/api')) {
+            if (!ctx.path.startsWith('/admin') || isAdminApiPath(ctx.path)) {
                 await next();
                 return;
             }

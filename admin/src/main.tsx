@@ -2,7 +2,14 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "rea
 import { createRoot } from "react-dom/client";
 import { Button, Card, Chip, Input, Label, ListBox, Select, Table, TextField } from "@heroui/react";
 import "./styles.css";
-import { ACCOUNT_REFRESH_INTERVAL_MS, getTaskRefreshIntervalMs } from "./refresh.ts";
+import {
+  ACCOUNT_REFRESH_INTERVAL_MS,
+  adminRoutePaths,
+  adminRoutes,
+  getAdminRouteFromPathname,
+  getTaskRefreshIntervalMs,
+  type AdminRoute,
+} from "./refresh.ts";
 
 type TokenRecord = {
   id: string;
@@ -45,10 +52,7 @@ type AlertRecord = {
   created_at: string;
 };
 
-const tabs = ["tokens", "api-keys", "tasks", "alerts"] as const;
-type Tab = (typeof tabs)[number];
-
-const tabLabels: Record<Tab, string> = {
+const tabLabels: Record<AdminRoute, string> = {
   tokens: "账号管理",
   "api-keys": "API Keys",
   tasks: "任务记录",
@@ -121,7 +125,7 @@ const timeColumns = new Set(["created_at", "updated_at", "last_checked_at", "las
 function App() {
   const [adminKey, setAdminKey] = useState(localStorage.getItem("adminKey") || "");
   const [adminAuthDisabled, setAdminAuthDisabled] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("tokens");
+  const [activeTab, setActiveTab] = useState<AdminRoute>(() => getAdminRouteFromPathname(window.location.pathname));
   const [tokens, setTokens] = useState<TokenRecord[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
@@ -133,6 +137,14 @@ function App() {
     "Content-Type": "application/json",
     "X-Admin-Key": adminKey,
   }), [adminKey]);
+
+  const navigateTo = useCallback((route: AdminRoute) => {
+    const path = adminRoutePaths[route];
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, "", path);
+    }
+    setActiveTab(route);
+  }, []);
 
   const api = useCallback(async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`/admin/api${path}`, {
@@ -167,9 +179,19 @@ function App() {
     setAlerts(body.data);
   }, [api]);
 
-  const loadInitialData = useCallback(async () => {
-    await Promise.all([loadTokens(), loadApiKeys(), loadTasks(), loadAlerts()]);
-  }, [loadAlerts, loadApiKeys, loadTasks, loadTokens]);
+  useEffect(() => {
+    const normalizeCurrentPath = () => {
+      const route = getAdminRouteFromPathname(window.location.pathname);
+      const path = adminRoutePaths[route];
+      if (window.location.pathname.replace(/\/+$/, "") !== path) {
+        window.history.replaceState(null, "", path);
+      }
+      setActiveTab(route);
+    };
+    normalizeCurrentPath();
+    window.addEventListener("popstate", normalizeCurrentPath);
+    return () => window.removeEventListener("popstate", normalizeCurrentPath);
+  }, []);
 
   useEffect(() => {
     if (adminKey) localStorage.setItem("adminKey", adminKey);
@@ -181,24 +203,33 @@ function App() {
       .then((response) => response.json())
       .then((config) => setAdminAuthDisabled(!!config.admin_auth_disabled))
       .catch(() => undefined)
-      .finally(() => {
-        loadInitialData().catch((error) => console.error(translateDisplayText(error.message)));
-      });
-  }, [loadInitialData]);
+  }, []);
 
   useEffect(() => {
+    const loadPage = {
+      tokens: loadTokens,
+      "api-keys": loadApiKeys,
+      tasks: loadTasks,
+      alerts: loadAlerts,
+    }[activeTab];
+    loadPage().catch((error) => console.error(translateDisplayText(error.message)));
+  }, [activeTab, loadAlerts, loadApiKeys, loadTasks, loadTokens]);
+
+  useEffect(() => {
+    if (activeTab !== "tokens") return undefined;
     const timer = window.setInterval(() => {
       loadTokens().catch((error) => console.error(translateDisplayText(error.message)));
     }, ACCOUNT_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [loadTokens]);
+  }, [activeTab, loadTokens]);
 
   useEffect(() => {
+    if (activeTab !== "tasks") return undefined;
     const timer = window.setInterval(() => {
       loadTasks().catch((error) => console.error(translateDisplayText(error.message)));
     }, getTaskRefreshIntervalMs(tasks));
     return () => window.clearInterval(timer);
-  }, [loadTasks, tasks]);
+  }, [activeTab, loadTasks, tasks]);
 
   async function createToken(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -271,9 +302,34 @@ function App() {
     await loadApiKeys();
   }
 
-  const openAlerts = alerts.filter((alert) => alert.status === "open").length;
-  const healthyTokens = tokens.filter((token) => token.status === "healthy" || token.status === "unchecked").length;
-  const runningTasks = tasks.filter((task) => task.status === "queued" || task.status === "running").length;
+  const pageMetrics = useMemo(() => {
+    if (activeTab === "tokens") {
+      return [
+        { label: "可用账号", value: tokens.filter((token) => token.status === "healthy" || token.status === "unchecked").length, detail: `总计 ${tokens.length}` },
+        { label: "异常账号", value: tokens.filter((token) => token.status === "unhealthy").length, detail: "需要处理" },
+        { label: "停用账号", value: tokens.filter((token) => token.status === "disabled").length, detail: "不参与轮询" },
+      ];
+    }
+    if (activeTab === "api-keys") {
+      return [
+        { label: "已启用", value: apiKeys.filter((apiKey) => apiKey.status === "active").length, detail: `总计 ${apiKeys.length}` },
+        { label: "已吊销", value: apiKeys.filter((apiKey) => apiKey.status === "revoked").length, detail: "不可继续调用" },
+        { label: "调用方", value: apiKeys.length, detail: "当前记录" },
+      ];
+    }
+    if (activeTab === "tasks") {
+      return [
+        { label: "运行中任务", value: tasks.filter((task) => task.status === "queued" || task.status === "running").length, detail: `最近 ${tasks.length} 条` },
+        { label: "成功任务", value: tasks.filter((task) => task.status === "succeeded").length, detail: "当前列表" },
+        { label: "失败任务", value: tasks.filter((task) => task.status === "failed").length, detail: "当前列表" },
+      ];
+    }
+    return [
+      { label: "未处理告警", value: alerts.filter((alert) => alert.status === "open").length, detail: `总计 ${alerts.length}` },
+      { label: "已处理告警", value: alerts.filter((alert) => alert.status === "resolved").length, detail: "当前列表" },
+      { label: "告警记录", value: alerts.length, detail: "最近记录" },
+    ];
+  }, [activeTab, alerts, apiKeys, tasks, tokens]);
 
   return (
     <main className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -291,12 +347,12 @@ function App() {
         )}
 
         <nav className="grid gap-2">
-          {tabs.map((tab) => (
+          {adminRoutes.map((tab) => (
             <Button
               key={tab}
               className="justify-start px-4 text-sm"
               variant={activeTab === tab ? "secondary" : "ghost"}
-              onPress={() => setActiveTab(tab)}
+              onPress={() => navigateTo(tab)}
             >
               {tabLabels[tab]}
             </Button>
@@ -307,9 +363,9 @@ function App() {
 
       <section className="min-w-0 bg-background p-5 md:p-8">
         <div className="mb-8 grid gap-4 md:grid-cols-3">
-          <Metric label="可用账号" value={healthyTokens} detail={`总计 ${tokens.length}`} />
-          <Metric label="运行中任务" value={runningTasks} detail={`最近 ${tasks.length} 条`} />
-          <Metric label="未处理告警" value={openAlerts} detail={`总计 ${alerts.length}`} />
+          {pageMetrics.map((metric) => (
+            <Metric key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
+          ))}
         </div>
 
         {activeTab === "tokens" && (
