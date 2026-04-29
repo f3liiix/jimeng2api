@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -64,4 +65,11 @@ test("created API key is shown immediately at the top of the table", () => {
     { id: "old", name: "old caller" },
   ]);
   assert.equal(mergeCreatedApiKey(existing, null), existing);
+});
+
+test("admin shell does not render the removed admin key field", () => {
+  const source = readFileSync(new URL("../admin/src/main.tsx", import.meta.url), "utf8");
+
+  assert.equal(source.includes("<Label>管理密钥</Label>"), false);
+  assert.equal(source.includes('name="adminKey"'), false);
 });

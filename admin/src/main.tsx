@@ -123,8 +123,7 @@ const severityLabels: Record<string, string> = {
 const timeColumns = new Set(["created_at", "updated_at", "last_checked_at", "last_used_at"]);
 
 function App() {
-  const [adminKey, setAdminKey] = useState(localStorage.getItem("adminKey") || "");
-  const [adminAuthDisabled, setAdminAuthDisabled] = useState(false);
+  const [adminKey] = useState(localStorage.getItem("adminKey") || "");
   const [activeTab, setActiveTab] = useState<AdminRoute>(() => getAdminRouteFromPathname(window.location.pathname));
   const [tokens, setTokens] = useState<TokenRecord[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([]);
@@ -192,18 +191,6 @@ function App() {
     normalizeCurrentPath();
     window.addEventListener("popstate", normalizeCurrentPath);
     return () => window.removeEventListener("popstate", normalizeCurrentPath);
-  }, []);
-
-  useEffect(() => {
-    if (adminKey) localStorage.setItem("adminKey", adminKey);
-    else localStorage.removeItem("adminKey");
-  }, [adminKey]);
-
-  useEffect(() => {
-    fetch("/admin/api/config")
-      .then((response) => response.json())
-      .then((config) => setAdminAuthDisabled(!!config.admin_auth_disabled))
-      .catch(() => undefined)
   }, []);
 
   useEffect(() => {
@@ -334,24 +321,17 @@ function App() {
 
   return (
     <main className="grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="flex flex-col gap-7 bg-surface-secondary border-b border-border p-6 lg:border-r lg:border-b-0 lg:p-8">
+      <aside className="flex flex-col gap-7 border-b border-border/50 p-6 lg:border-r lg:border-b-0 lg:p-8">
         <div className="space-y-3">
-          <p className="text-xs font-semibold tracking-[0.24em] text-muted uppercase">Jimeng2API</p>
+          <p className="text-xs font-normal tracking-[0.24em] text-muted uppercase">Jimeng2API</p>
           <h1 className="text-4xl leading-none font-semibold tracking-tighter text-foreground">管理控制台</h1>
         </div>
-
-        {!adminAuthDisabled && (
-          <TextField name="adminKey" value={adminKey} onChange={setAdminKey}>
-            <Label>管理密钥</Label>
-            <Input placeholder="请输入管理密钥" />
-          </TextField>
-        )}
 
         <nav className="grid gap-2">
           {adminRoutes.map((tab) => (
             <Button
               key={tab}
-              className="justify-start px-4 text-sm"
+              className="justify-start px-4 text-sm w-full"
               variant={activeTab === tab ? "secondary" : "ghost"}
               onPress={() => navigateTo(tab)}
             >
