@@ -2,6 +2,7 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "rea
 import { createRoot } from "react-dom/client";
 import { Button, Card, Chip, Input, Label, ListBox, Select, Table, TextField } from "@heroui/react";
 import "./styles.css";
+import { ApiDocsPage } from "./components/ApiDocsPage.tsx";
 import {
   ACCOUNT_REFRESH_INTERVAL_MS,
   adminRoutePaths,
@@ -63,6 +64,7 @@ const tabLabels: Record<AdminRoute, string> = {
   "api-keys": "API Keys",
   tasks: "任务记录",
   alerts: "告警记录",
+  docs: "接口文档",
 };
 
 const columnLabels: Record<string, string> = {
@@ -194,6 +196,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (activeTab === "docs") return;
     const loadPage = {
       tokens: loadTokens,
       "api-keys": loadApiKeys,
@@ -312,6 +315,7 @@ function App() {
         { label: "失败任务", value: tasks.filter((task) => task.status === "failed").length, detail: "当前列表" },
       ];
     }
+    if (activeTab === "docs") return [];
     return [
       { label: "未处理告警", value: alerts.filter((alert) => alert.status === "open").length, detail: `总计 ${alerts.length}` },
       { label: "已处理告警", value: alerts.filter((alert) => alert.status === "resolved").length, detail: "当前列表" },
@@ -343,11 +347,13 @@ function App() {
       </aside>
 
       <section className="min-w-0 bg-background p-5 md:p-8">
-        <div className="mb-8 grid gap-4 md:grid-cols-3">
-          {pageMetrics.map((metric) => (
-            <Metric key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
-          ))}
-        </div>
+        {pageMetrics.length > 0 && (
+          <div className="mb-8 grid gap-4 md:grid-cols-3">
+            {pageMetrics.map((metric) => (
+              <Metric key={metric.label} label={metric.label} value={metric.value} detail={metric.detail} />
+            ))}
+          </div>
+        )}
 
         {activeTab === "tokens" && (
           <Panel title="账号管理" description="健康账号会按排序值顺序轮询">
@@ -464,6 +470,8 @@ function App() {
             </div>
           </Panel>
         )}
+
+        {activeTab === "docs" && <ApiDocsPage />}
       </section>
     </main>
   );

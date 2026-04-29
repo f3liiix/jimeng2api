@@ -102,3 +102,136 @@
     min-height: 100vh;
   }
 }
+
+.api-docs-card {
+  width: min(100%, 72rem);
+  margin-inline: auto;
+}
+
+.api-docs {
+  display: grid;
+  gap: 1rem;
+  color: var(--foreground);
+  line-height: 1.75;
+}
+
+.api-docs h1,
+.api-docs h2,
+.api-docs h3 {
+  color: var(--foreground);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.api-docs h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.api-docs h2 {
+  margin-top: 1.5rem;
+  border-top: 1px solid color-mix(in oklch, var(--border), transparent 35%);
+  padding-top: 1.5rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.api-docs h3 {
+  margin-top: 0.75rem;
+  font-size: 1.2rem;
+}
+
+.api-docs p,
+.api-docs li,
+.api-docs td,
+.api-docs th {
+  color: var(--muted);
+}
+
+.api-docs ul,
+.api-docs ol {
+  padding-left: 1.25rem;
+}
+
+.api-docs ul {
+  list-style: disc;
+}
+
+.api-docs ol {
+  list-style: decimal;
+}
+
+.api-docs-table {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  border-radius: 1rem;
+  background: var(--surface);
+}
+
+.api-docs-table table {
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.api-docs th,
+.api-docs td {
+  border-bottom: 1px solid color-mix(in oklch, var(--border), transparent 25%);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.api-docs th {
+  background: var(--surface-secondary);
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.api-docs tr:last-child td {
+  border-bottom: 0;
+}
+
+.api-docs blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: var(--surface-secondary);
+  color: var(--muted);
+}
+
+.api-docs :not(pre) > code {
+  border: 1px solid color-mix(in oklch, var(--border), transparent 30%);
+  border-radius: 0.375rem;
+  background: var(--surface-secondary);
+  padding: 0.1rem 0.35rem;
+  color: var(--foreground);
+  font-size: 0.9em;
+}
+
+.api-docs-code {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
+  border-radius: 1rem;
+  background: var(--surface-secondary);
+}
+
+.api-docs-code__actions {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+}
+
+.api-docs-code pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 1.25rem 6rem 1.25rem 1.25rem;
+}
+
+.api-docs-code code {
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}

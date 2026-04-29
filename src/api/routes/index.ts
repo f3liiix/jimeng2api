@@ -14,8 +14,7 @@ export default [
                     service: 'jimeng2api',
                     status: 'running',
                     version: '1.0.0',
-                    description: '免费的AI图像和视频生成API服务 - 基于即梦AI的逆向工程实现',
-                    documentation: 'https://github.com/f3liiix/jimeng2api',
+                    description: '将即梦AI网页版转换成API服务',
                     endpoints: {
                         images: '/v1/images/generations',
                         compositions: '/v1/images/compositions',

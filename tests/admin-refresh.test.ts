@@ -17,6 +17,7 @@ test("admin route parser maps supported paths to pages", () => {
   assert.equal(getAdminRouteFromPathname("/admin/api-keys"), "api-keys");
   assert.equal(getAdminRouteFromPathname("/admin/tasks"), "tasks");
   assert.equal(getAdminRouteFromPathname("/admin/alerts"), "alerts");
+  assert.equal(getAdminRouteFromPathname("/admin/docs"), "docs");
 });
 
 test("admin route parser falls back to tokens for unknown paths", () => {
@@ -72,4 +73,57 @@ test("admin shell does not render the removed admin key field", () => {
 
   assert.equal(source.includes("<Label>管理密钥</Label>"), false);
   assert.equal(source.includes('name="adminKey"'), false);
+});
+
+test("admin API docs use plain UUID task ids", () => {
+  const docs = readFileSync(new URL("../admin/src/docs/api-docs.md", import.meta.url), "utf8");
+
+  assert.equal(docs.includes("task_xxxxx"), false);
+  assert.doesNotMatch(docs, /task_[0-9a-f]{8}/i);
+  assert.match(docs, /550e8400-e29b-41d4-a716-446655440000/);
+});
+
+test("admin API docs only document video generation endpoints", () => {
+  const docs = readFileSync(new URL("../admin/src/docs/api-docs.md", import.meta.url), "utf8");
+
+  assert.equal(docs.includes("/v1/images/generations"), false);
+  assert.equal(docs.includes("/v1/images/compositions"), false);
+  assert.match(docs, /\/v1\/videos\/generations/);
+});
+
+test("admin API docs list Seedance 2.0 video model values", () => {
+  const docs = readFileSync(new URL("../admin/src/docs/api-docs.md", import.meta.url), "utf8");
+
+  for (const model of [
+    "jimeng-video-seedance-2.0",
+    "jimeng-video-seedance-2.0-fast",
+    "jimeng-video-seedance-2.0-vip",
+    "jimeng-video-seedance-2.0-fast-vip",
+  ]) {
+    assert.match(docs, new RegExp(`\\\`${model}\\\``));
+  }
+});
+
+test("admin API docs list supported video ratios", () => {
+  const docs = readFileSync(new URL("../admin/src/docs/api-docs.md", import.meta.url), "utf8");
+
+  for (const ratio of ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9"]) {
+    assert.match(docs, new RegExp(`\\\`${ratio}\\\``));
+  }
+});
+
+test("admin API docs only describe API key authentication", () => {
+  const docs = readFileSync(new URL("../admin/src/docs/api-docs.md", import.meta.url), "utf8");
+
+  assert.doesNotMatch(docs, /session[_ ]?id/i);
+  assert.match(docs, /Authorization: Bearer <API_KEY>/);
+});
+
+test("admin API docs describe defaults and task errors accurately", () => {
+  const docs = readFileSync(new URL("../admin/src/docs/api-docs.md", import.meta.url), "utf8");
+
+  assert.match(docs, /\| `model` \| string \| 否 \|/);
+  assert.match(docs, /默认 `jimeng-video-3\.5-pro`/);
+  assert.match(docs, /`task_not_found`/);
+  assert.match(docs, /仅 `jimeng-video-3\.0` 和 `jimeng-video-3\.0-fast` 生效/);
 });

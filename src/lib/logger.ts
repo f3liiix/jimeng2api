@@ -33,17 +33,23 @@ class LogWriter {
         !isVercelEnv && await fs.appendFile(path.join(config.system.logDirPath, `/${util.getDateString()}.log`), buffer);
     }
 
+    #scheduleWork() {
+        const timer = setTimeout(this.work.bind(this), config.system.logWriteInterval);
+        timer.unref?.();
+        return timer;
+    }
+
     flush() {
         if(!this.#buffers.length) return;
         !isVercelEnv && fs.appendFileSync(path.join(config.system.logDirPath, `/${util.getDateString()}.log`), Buffer.concat(this.#buffers));
     }
 
     work() {
-        if (!this.#buffers.length) return setTimeout(this.work.bind(this), config.system.logWriteInterval);
+        if (!this.#buffers.length) return this.#scheduleWork();
         const buffer = Buffer.concat(this.#buffers);
         this.#buffers = [];
         this.write(buffer)
-        .finally(() => setTimeout(this.work.bind(this), config.system.logWriteInterval))
+        .finally(() => this.#scheduleWork())
         .catch(err => console.error("Log write error:", err));
     }
 
