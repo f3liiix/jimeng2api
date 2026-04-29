@@ -31,7 +31,13 @@ export async function authenticateApiKey(request: Request) {
   return apiKey;
 }
 
+export function isAdminAuthDisabled(env: NodeJS.ProcessEnv = process.env) {
+  return env.ADMIN_AUTH_DISABLED === "true" || env.ADMIN_AUTH_DISABLED === "1";
+}
+
 export function requireAdmin(request: Request) {
+  if (isAdminAuthDisabled()) return;
+
   const configured = process.env.ADMIN_API_KEY;
   if (!configured) {
     throw new APIException(EX.API_TOKEN_EXPIRES, "ADMIN_API_KEY 未配置，管理接口不可用", {

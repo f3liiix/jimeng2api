@@ -88,7 +88,13 @@ Authorization: Bearer your_client_api_key
 http://localhost:5100/admin
 ```
 
-后台登录使用 `ADMIN_API_KEY`。Docker Compose 会同时启动 Postgres，并通过以下环境变量初始化：
+后台登录使用 `ADMIN_API_KEY`。Docker Compose 会自动读取项目根目录的 `.env`，建议先复制示例文件：
+
+```bash
+cp .env.example .env
+```
+
+然后修改 `.env` 中的密钥：
 
 ```bash
 ADMIN_API_KEY=<生成一个高强度管理密钥>
@@ -99,7 +105,7 @@ TOKEN_HEALTH_CHECK_INTERVAL_MS=600000
 TOKEN_HEALTH_FAILURE_THRESHOLD=3
 ```
 
-这些密钥必须显式配置，Compose 不会提供可用于生产的默认值。`INITIAL_API_KEY` 会写入数据库作为第一个外部调用 API Key；之后可以在管理后台继续创建新的 API Key 和托管 token。
+这些密钥必须显式配置，`.env` 不应提交到仓库。`INITIAL_API_KEY` 会写入数据库作为第一个外部调用 API Key；之后可以在管理后台继续创建新的 API Key 和托管 token。
 
 ### 环境要求
 

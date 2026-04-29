@@ -3,7 +3,7 @@ import _ from "lodash";
 import Request from "@/lib/request/Request.ts";
 import APIException from "@/lib/exceptions/APIException.ts";
 import EX from "@/api/consts/exceptions.ts";
-import { requireAdmin } from "@/lib/auth/request-auth.ts";
+import { isAdminAuthDisabled, requireAdmin } from "@/lib/auth/request-auth.ts";
 import { apiKeyStore } from "@/lib/auth/api-key-store.ts";
 import {
   ManagedTokenRegion,
@@ -66,6 +66,12 @@ export default {
   prefix: "/admin/api",
 
   get: {
+    "/config": async () => {
+      return {
+        admin_auth_disabled: isAdminAuthDisabled(),
+      };
+    },
+
     "/api-keys": async (request: Request) => {
       requireAdmin(request);
       const apiKeys = await apiKeyStore.list();

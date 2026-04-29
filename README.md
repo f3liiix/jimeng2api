@@ -86,7 +86,13 @@ Admin UI:
 http://localhost:5100/admin
 ```
 
-The admin UI uses `ADMIN_API_KEY`. Docker Compose starts Postgres and supports these initialization variables:
+The admin UI uses `ADMIN_API_KEY`. Docker Compose automatically reads `.env` from the project root. Start by copying the example:
+
+```bash
+cp .env.example .env
+```
+
+Then edit the secrets in `.env`:
 
 ```bash
 ADMIN_API_KEY=<generate-a-strong-admin-secret>
@@ -97,7 +103,7 @@ TOKEN_HEALTH_CHECK_INTERVAL_MS=600000
 TOKEN_HEALTH_FAILURE_THRESHOLD=3
 ```
 
-These secrets must be configured explicitly; Compose does not provide production-safe defaults. `INITIAL_API_KEY` is stored as the first external caller API Key; more API Keys and managed tokens can be created in the admin UI.
+These secrets must be configured explicitly, and `.env` should not be committed. `INITIAL_API_KEY` is stored as the first external caller API Key; more API Keys and managed tokens can be created in the admin UI.
 
 ### Environment Requirements
 

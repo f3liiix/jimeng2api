@@ -48,6 +48,7 @@ type Tab = (typeof tabs)[number];
 
 function App() {
   const [adminKey, setAdminKey] = useState(localStorage.getItem("adminKey") || "");
+  const [adminAuthDisabled, setAdminAuthDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("tokens");
   const [tokens, setTokens] = useState<TokenRecord[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([]);
@@ -76,8 +77,7 @@ function App() {
   }
 
   async function refresh() {
-    if (!adminKey) return;
-    localStorage.setItem("adminKey", adminKey);
+    if (adminKey) localStorage.setItem("adminKey", adminKey);
     setStatus("正在刷新数据...");
     try {
       const [tokenBody, keyBody, taskBody, alertBody] = await Promise.all([
@@ -97,7 +97,13 @@ function App() {
   }
 
   useEffect(() => {
-    refresh();
+    fetch("/admin/api/config")
+      .then((response) => response.json())
+      .then((config) => setAdminAuthDisabled(!!config.admin_auth_disabled))
+      .catch(() => undefined)
+      .finally(() => {
+        refresh();
+      });
   }, []);
 
   async function createToken(event: FormEvent<HTMLFormElement>) {
@@ -179,10 +185,12 @@ function App() {
           <h1>Admin Control</h1>
           <p className="muted">管理托管 token、API Key、任务状态和失效告警。</p>
         </div>
-        <label className="field">
-          Admin Key
-          <input value={adminKey} onChange={(event) => setAdminKey(event.target.value)} placeholder="ADMIN_API_KEY" />
-        </label>
+        {!adminAuthDisabled && (
+          <label className="field">
+            Admin Key
+            <input value={adminKey} onChange={(event) => setAdminKey(event.target.value)} placeholder="ADMIN_API_KEY" />
+          </label>
+        )}
         <button className="primary" onClick={refresh}>刷新</button>
         <nav>
           {tabs.map((tab) => (
